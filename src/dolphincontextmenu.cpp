@@ -13,6 +13,8 @@
 #include "dolphinplacesmodelsingleton.h"
 #include "dolphinremoveaction.h"
 #include "dolphinviewcontainer.h"
+#include "finder/finderairdrop.h"
+#include "finder/finderairdropservice.h"
 #include "global.h"
 #include "settings/dolphinsettingsdialog.h"
 #include "trash/dolphintrash.h"
@@ -307,6 +309,21 @@ void DolphinContextMenu::addItemContextMenu()
         }
         // Insert 'Open With" entries
         addOpenWithActions();
+    }
+
+    // Finder: Share › AirDrop… for local files (folders can't be AirDropped).
+    QList<QUrl> shareable;
+    for (const KFileItem &item : std::as_const(m_selectedItems)) {
+        if (item.isLocalFile() && item.isFile()) {
+            shareable.append(item.url());
+        }
+    }
+    if (!shareable.isEmpty() && shareable.size() == m_selectedItems.size()) {
+        QMenu *share = addMenu(QIcon::fromTheme(QStringLiteral("document-share")), i18nc("@action:inmenu Finder", "Share"));
+        share->addAction(FinderAirDropView::icon(QColor(0x0a, 0x84, 0xff)), i18nc("@action:inmenu Finder", "AirDrop…"), this, [this, shareable]() {
+            FinderAirDrop::instance()->share(shareable, m_mainWindow);
+        });
+        addSeparator();
     }
 
     insertDefaultItemActions(selectedItemsProps);

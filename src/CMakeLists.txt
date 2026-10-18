@@ -289,6 +289,9 @@ target_sources(dolphinstatic PRIVATE
     finder/findersidebar.cpp
     finder/findercolumnview.cpp
     finder/finderairdrop.cpp
+    finder/finderairdropservice.cpp
+    finder/finderairdropsheet.cpp
+    finder/findertransfers.cpp
     admin/bar.cpp
     admin/workerintegration.cpp
     animatedheightwidget.cpp

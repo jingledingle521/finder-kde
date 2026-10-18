@@ -16,6 +16,7 @@
 class FinderAirDropView;
 class FinderColumnView;
 class FinderSidebar;
+class FinderTransfersView;
 class KWindowShadow;
 class QMainWindow;
 class QAction;
@@ -64,6 +65,8 @@ private:
     /** Shows the AirDrop panel over the view; @p files are offered for sending. */
     void showAirDrop(const QList<QUrl> &files);
     void hideAirDrop();
+    /** Puts the AirDrop progress cards in the bottom-right of the file view. */
+    void placeTransfers();
     void updateTitleColor();
     void updateLead();
     void paintCapsules(QPainter &p);
@@ -87,6 +90,7 @@ private:
     QPointer<FinderColumnView> m_columns;
     QPointer<FinderAirDropView> m_airDrop;
     QPointer<FinderSidebar> m_finderSidebar;
+    QPointer<FinderTransfersView> m_transfers; // AirDrop progress cards
     bool m_columnMode = false;
     KWindowShadow *m_shadow = nullptr;
     QRegion m_appliedBlur; // last blur region sent to KWin

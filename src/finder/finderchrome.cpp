@@ -7,7 +7,9 @@
 #include "finderchrome.h"
 #include "finderairdrop.h"
 #include "findercolumnview.h"
+#include "finderairdropservice.h"
 #include "findersidebar.h"
+#include "findertransfers.h"
 
 #include "dolphinmainwindow.h"
 #include "dolphinviewcontainer.h"
@@ -434,6 +436,7 @@ void FinderChrome::setToolBar(QToolBar *toolBar)
         button->setToolButtonStyle(Qt::ToolButtonIconOnly);
     }
     QTimer::singleShot(0, this, [this]() {
+        placeTransfers();
         setColumnMode(m_columnMode);
     });
 }
@@ -500,6 +503,22 @@ void FinderChrome::hideAirDrop()
     if (container && m_finderSidebar) {
         m_finderSidebar->setUrl(container->url());
     }
+}
+
+void FinderChrome::placeTransfers()
+{
+    if (!m_transfers) {
+        // Creating it also starts FinderAirDrop watching for incoming transfers.
+        m_transfers = new FinderTransfersView(m_window);
+    }
+    auto *window = qobject_cast<DolphinMainWindow *>(m_window);
+    DolphinViewContainer *container = window ? window->activeViewContainer() : nullptr;
+    if (!container) {
+        return;
+    }
+    // Against the file view's bottom-right corner, clear of the footer.
+    const QWidget *view = container->view();
+    m_transfers->setAnchor(view->mapTo(m_window, QPoint(view->width(), view->height())) - QPoint(16, 16));
 }
 
 void FinderChrome::leaveColumnMode()
@@ -648,7 +667,13 @@ QToolButton *FinderChrome::createMoreButton(QToolBar *toolBar)
                     }
                 }
             }
-            showAirDrop(files);
+            // With files selected, share them in place (Finder's share sheet);
+            // otherwise open the AirDrop window.
+            if (files.isEmpty()) {
+                showAirDrop({});
+            } else {
+                FinderAirDrop::instance()->share(files, m_window);
+            }
         });
         menu->addSeparator();
         const QList<QStringList> sections = {
@@ -913,6 +938,7 @@ bool FinderChrome::eventFilter(QObject *watched, QEvent *event)
             break;
         case QEvent::Resize:
             updateWindowEffects();
+            placeTransfers();
             break;
         case QEvent::WindowStateChange:
             updateWindowEffects();
