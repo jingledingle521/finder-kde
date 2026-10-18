@@ -52,6 +52,9 @@ public:
     qreal offset() const;
 
     void setSidePadding(qreal leftPaddingWidth, qreal rightPaddingWidth);
+
+    /** Finder: x where file names start, so the first column title lines up with them. */
+    void setNameTextX(qreal x);
     qreal leftPadding() const;
     qreal rightPadding() const;
 
@@ -176,6 +179,7 @@ private:
         int index;
     };
     MovingRole m_movingRole;
+    qreal m_nameTextX = -1;
 };
 
 #endif

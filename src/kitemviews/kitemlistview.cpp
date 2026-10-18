@@ -780,6 +780,44 @@ void KItemListView::paint(QPainter *painter, const QStyleOptionGraphicsItem *opt
 {
     QGraphicsWidget::paint(painter, option, widget);
 
+    if (useAlternateBackgrounds()) {
+        // Finder: the zebra stripes carry on below the last item, filling the view.
+        KItemListWidget *last = nullptr;
+        for (auto it = m_visibleItems.constBegin(); it != m_visibleItems.constEnd(); ++it) {
+            if (!last || it.key() > last->index()) {
+                last = it.value();
+            }
+        }
+        qreal rowHeight;
+        qreal y;
+        int index;
+        if (last) {
+            rowHeight = last->size().height();
+            y = last->pos().y() + rowHeight;
+            index = last->index() + 1;
+            if (m_headerWidget->isVisible()) {
+                m_headerWidget->setNameTextX(last->pos().x() + last->textFocusRect().left() + m_styleOption.padding);
+            }
+        } else {
+            rowHeight = m_styleOption.padding * 2 + qMax(qreal(m_styleOption.iconSize), qreal(m_styleOption.fontMetrics.height()));
+            y = m_headerWidget->isVisible() ? m_headerWidget->size().height() : 0;
+            index = 0;
+        }
+        if (m_model && (!last || last->index() >= m_model->count() - 1) && rowHeight > 0) {
+            const bool dark = palette().color(QPalette::Window).lightnessF() < 0.5;
+            painter->save();
+            painter->setRenderHint(QPainter::Antialiasing);
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(dark ? QColor(255, 255, 255, 14) : QColor(0, 0, 0, 10));
+            for (; y < size().height(); y += rowHeight, ++index) {
+                if (index & 1) {
+                    painter->drawRoundedRect(QRectF(8, y, size().width() - 16, rowHeight), 6, 6);
+                }
+            }
+            painter->restore();
+        }
+    }
+
     for (auto animation : std::as_const(m_rubberBandAnimations)) {
         QRectF rubberBandRect = animation->property(RubberPropertyName).toRectF();
 

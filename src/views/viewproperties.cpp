@@ -535,8 +535,10 @@ QList<QByteArray> ViewProperties::visibleRoles() const
     const bool useDefaultValues = roles.count() == 1 // "text"
         && (m_node->viewMode() == DolphinView::DetailsView) && !visibleRoles.contains(CustomizedDetailsString);
     if (useDefaultValues) {
-        roles.append("size");
+        // Finder's list columns: Date Modified, Size, Kind.
         roles.append("modificationtime");
+        roles.append("size");
+        roles.append("type");
     }
 
     return roles;

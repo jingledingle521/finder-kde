@@ -159,6 +159,14 @@ qreal KItemListHeaderWidget::offset() const
     return m_offset;
 }
 
+void KItemListHeaderWidget::setNameTextX(qreal x)
+{
+    if (!qFuzzyCompare(m_nameTextX + 1, x + 1)) {
+        m_nameTextX = x;
+        update();
+    }
+}
+
 void KItemListHeaderWidget::setSidePadding(qreal leftPaddingWidth, qreal rightPaddingWidth)
 {
     bool changed = false;
@@ -476,7 +484,10 @@ void KItemListHeaderWidget::paintRole(QPainter *painter, const QByteArray &role,
     painter->setPen(QColor(255, 255, 255, alpha));
 
     const qreal chevronSpace = sorted ? 18 : 0;
-    const QRectF textRect = rect.adjusted(10, 0, -8 - chevronSpace, 0);
+    QRectF textRect = rect.adjusted(10, 0, -8 - chevronSpace, 0);
+    if (orderIndex == 0 && m_nameTextX > textRect.left() && m_nameTextX < textRect.right()) {
+        textRect.setLeft(m_nameTextX); // line up with the file names
+    }
     const QString text = QFontMetrics(font).elidedText(m_model->roleDescription(role), Qt::ElideRight, int(textRect.width()));
     painter->drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft, text);
 

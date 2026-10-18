@@ -21,7 +21,7 @@
         </entry>
         <entry name="PreviewSize" type="Int">
             <label>Preview size</label>
-            <default code="true">KIconLoader::SizeLarge</default>
+            <default code="true">KIconLoader::SizeSmall</default> <!-- Finder: small icons in list view -->
         </entry>
         <entry name="ColumnPositions" type="IntList">
             <label>Position of columns</label>

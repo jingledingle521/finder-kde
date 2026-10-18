@@ -16,6 +16,7 @@
 
 #include <QGraphicsScene>
 #include <QGraphicsView>
+#include <QRegularExpression>
 #include <QMimeDatabase>
 
 KFileItemListWidgetInformant::KFileItemListWidgetInformant()
@@ -54,6 +55,19 @@ QString KFileItemListWidgetInformant::roleText(const QByteArray &role, const QHa
     // use a hash + switch for a linear runtime.
 
     auto formatDate = [formatter, local, forUsageAs](const QDateTime &time) {
+        if (forUsageAs == KStandardItemListWidgetInformant::ForUsageAs::DisplayedText) {
+            // Finder: "Today at 4:49 PM", "Yesterday at …", "Sep 27, 2026 at 11:24 PM".
+            const QString clock = local.toString(time.time(), QLocale::ShortFormat);
+            const QDate day = time.date();
+            const QDate today = QDate::currentDate();
+            if (day == today) {
+                return i18nc("@item:intable Finder date", "Today at %1", clock);
+            }
+            if (day == today.addDays(-1)) {
+                return i18nc("@item:intable Finder date", "Yesterday at %1", clock);
+            }
+            return i18nc("@item:intable Finder date: day, time", "%1 at %2", local.toString(day, QStringLiteral("MMM d, yyyy")), clock);
+        }
         if (ContentDisplaySettings::useShortRelativeDates()) {
             return formatter.formatRelativeDateTime(time,
                                                     forUsageAs == KStandardItemListWidgetInformant::ForUsageAs::DisplayedText ? QLocale::ShortFormat
@@ -63,7 +77,25 @@ QString KFileItemListWidgetInformant::roleText(const QByteArray &role, const QHa
         }
     };
 
-    if (role == "size") {
+    // Finder: decimal sizes ("193 bytes", "245 KB", "1.2 MB"), "--" for folders.
+    auto finderSize = [](KIO::filesize_t size) -> QString {
+        if (size < 1000) {
+            return i18ncp("@item:intable Finder size", "%1 byte", "%1 bytes", qulonglong(size));
+        }
+        static const char *units[] = {"KB", "MB", "GB", "TB", "PB"};
+        double value = size / 1000.0;
+        int unit = 0;
+        while (value >= 999.5 && unit < 4) {
+            value /= 1000.0;
+            ++unit;
+        }
+        const QString number = value >= 99.95 ? QString::number(qRound(value)) : QLocale().toString(value, 'f', 1).remove(QRegularExpression(QStringLiteral("[.,]0$")));
+        return number + QLatin1Char(' ') + QLatin1String(units[unit]);
+    };
+
+    if (role == "size" && forUsageAs == KStandardItemListWidgetInformant::ForUsageAs::DisplayedText) {
+        text = values.value("isDir").toBool() ? QStringLiteral("--") : finderSize(roleValue.value<KIO::filesize_t>());
+    } else if (role == "size") {
         if (values.value("isDir").toBool()) {
             if (!roleValue.isNull() && roleValue != -1) {
                 // The item represents a directory.
