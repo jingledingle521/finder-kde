@@ -493,7 +493,8 @@ bool KStandardItemListWidget::paintFinderHighlight(QPainter *painter, QWidget *w
     painter->setPen(Qt::NoPen);
     if (m_layout == DetailsLayout) {
         painter->setBrush(accent);
-        painter->drawRoundedRect(selectionRectFull().adjusted(2, 0, -2, 0), 6, 6);
+        // The whole row, edge to edge (with a small inset), whatever the columns.
+        painter->drawRoundedRect(QRectF(6, 0, size().width() - 12, size().height()), 6, 6);
     } else {
         painter->setBrush(QColor(255, 255, 255, 30));
         painter->drawRoundedRect(m_iconRect.adjusted(-5, -5, 5, 5), 7, 7);
