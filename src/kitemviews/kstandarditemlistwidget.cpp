@@ -85,8 +85,8 @@ qreal KStandardItemListWidgetInformant::preferredRoleColumnWidth(const QByteArra
             if (view->supportsItemExpanding()) {
                 // Increase the width by the expansion-toggle and the current expansion level
                 const int expandedParentsCount = values.value("expandedParentsCount", 0).toInt();
-                const qreal height = option.padding * 2 + qMax(option.iconSize, fontMetrics.height());
-                width += (expandedParentsCount + 1) * height;
+                // Finder: a small fixed disclosure slot per level.
+                width += (expandedParentsCount + 1) * 18;
             }
 
             // Increase the width by the required space for the icon
@@ -1095,11 +1095,12 @@ void KStandardItemListWidget::updateExpansionArea()
         const QHash<QByteArray, QVariant> values = data();
         const int expandedParentsCount = values.value("expandedParentsCount", 0).toInt();
         if (expandedParentsCount >= 0) {
-            const int widgetIconSize = styleOption().iconSize;
+            // Finder: a small disclosure triangle in an 18 px slot per level,
+            // instead of an icon-sized slot (which left a wide gap in list view).
+            const int widgetIconSize = 14;
             const qreal widgetHeight = size().height();
-            const qreal inc = (widgetHeight - widgetIconSize) / 2;
-            const qreal x = expandedParentsCount * widgetHeight + inc;
-            const qreal y = inc;
+            const qreal x = expandedParentsCount * 18 + 2;
+            const qreal y = (widgetHeight - widgetIconSize) / 2;
             if (layoutDirection() == Qt::LeftToRight) {
                 const qreal leftPaddingWidth = m_highlightEntireRow ? leftPadding() : 0;
                 m_expansionArea = QRectF(leftPaddingWidth + x, y, widgetIconSize, widgetIconSize);
@@ -1544,8 +1545,8 @@ void KStandardItemListWidget::updateDetailsLayoutTextCache()
     const qreal columnWidthInc = columnPadding(option);
     qreal firstColumnInc = styleOption().iconSize;
     if (m_supportsItemExpanding) {
-        firstColumnInc += isLeftToRight ? (m_expansionArea.left() + m_expansionArea.right() + widgetHeight) / 2
-                                        : ((size().width() - m_expansionArea.left()) + (size().width() - m_expansionArea.right()) + widgetHeight) / 2;
+        // Finder: the icon follows right after the disclosure slot.
+        firstColumnInc += option.padding + (isLeftToRight ? m_expansionArea.right() : size().width() - m_expansionArea.left());
     } else {
         firstColumnInc += option.padding + (isLeftToRight ? leftPadding() : rightPadding());
     }

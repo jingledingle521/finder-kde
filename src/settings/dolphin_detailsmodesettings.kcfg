@@ -29,11 +29,11 @@
         </entry>
         <entry name="LeftPadding" type="UInt">
             <label>Left side padding</label>
-            <default>20</default>
+            <default>8</default> <!-- Finder -->
         </entry>
         <entry name="RightPadding" type="UInt">
             <label>Right side padding</label>
-            <default>20</default>
+            <default>16</default> <!-- Finder -->
         </entry>
         <entry name="HighlightEntireRow" type="Bool">
             <label>Highlight entire row</label>
