@@ -9,6 +9,7 @@
 #include "dolphinmainwindow.h"
 
 #include "finder/finderchrome.h"
+#include "finder/findersidebar.h"
 
 #include "admin/workerintegration.h"
 #include "dolphin_generalsettings.h"
@@ -2510,7 +2511,17 @@ void DolphinMainWindow::setupDockWidgets()
 
     m_placesPanel = new PlacesPanel(placesDock);
     m_placesPanel->setCustomContextMenuActions({lockLayoutAction});
-    placesDock->setWidget(m_placesPanel);
+
+    // Finder: show the Golden Gate sidebar instead of the Places panel. The
+    // panel stays (hidden) because device teardown and settings use it.
+    auto *finderSidebar = new FinderSidebar(DolphinPlacesModelSingleton::instance().placesModel(), placesDock);
+    m_placesPanel->hide();
+    placesDock->setWidget(finderSidebar);
+    placesDock->setLocked(true); // no dock title bar
+    placesDock->setMinimumWidth(180);
+    connect(finderSidebar, &FinderSidebar::placeActivated, this, &DolphinMainWindow::slotPlaceActivated);
+    connect(finderSidebar, &FinderSidebar::tabRequested, this, &DolphinMainWindow::openNewTab);
+    connect(this, &DolphinMainWindow::urlChanged, finderSidebar, &FinderSidebar::setUrl);
 
     createPanelAction(QIcon::fromTheme(QStringLiteral("compass")), Qt::Key_F9, placesDock, QStringLiteral("show_places_panel"));
 
