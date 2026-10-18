@@ -8,6 +8,8 @@
 
 #include "dolphinmainwindow.h"
 
+#include "finder/finderchrome.h"
+
 #include "admin/workerintegration.h"
 #include "dolphin_generalsettings.h"
 #include "dolphinbookmarkhandler.h"
@@ -211,6 +213,11 @@ DolphinMainWindow::DolphinMainWindow()
 
     const bool usePhoneUi{KRuntimePlatform::runtimePlatform().contains(QLatin1String("phone"))};
     setupGUI(Save | Create | ToolBar, usePhoneUi ? QStringLiteral("finderuiforphones.rc") : QString() /* load the default dolphinui.rc file */);
+
+    // Finder: our own macOS window chrome instead of the window manager's.
+    auto *chrome = new FinderChrome(this);
+    chrome->setToolBar(toolBar(QStringLiteral("mainToolBar")));
+    chrome->setSidebar(m_placesPanel->parentWidget());
     stateChanged(QStringLiteral("new_file"));
 
     QClipboard *clipboard = QApplication::clipboard();

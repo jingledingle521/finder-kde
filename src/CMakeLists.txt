@@ -285,6 +285,7 @@ install(FILES dolphinpartactions.desktop DESTINATION "${KDE_INSTALL_DATADIR}/dol
 add_library(dolphinstatic STATIC)
 
 target_sources(dolphinstatic PRIVATE
+    finder/finderchrome.cpp
     admin/bar.cpp
     admin/workerintegration.cpp
     animatedheightwidget.cpp
