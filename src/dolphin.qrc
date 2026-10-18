@@ -1,6 +1,6 @@
 <RCC>
-<qresource prefix="/kxmlgui5/dolphin">
-<file>dolphinui.rc</file>
-<file>dolphinuiforphones.rc</file>
+<qresource prefix="/kxmlgui5/finder">
+<file alias="finderui.rc">dolphinui.rc</file>
+<file alias="finderuiforphones.rc">dolphinuiforphones.rc</file>
 </qresource>
 </RCC>

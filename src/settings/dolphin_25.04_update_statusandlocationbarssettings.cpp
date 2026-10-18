@@ -10,7 +10,7 @@
 int main()
 {
     const auto showStatusBar = QStringLiteral("ShowStatusBar");
-    auto config = KSharedConfig::openConfig(QStringLiteral("dolphinrc"));
+    auto config = KSharedConfig::openConfig(QStringLiteral("finderrc"));
 
     KConfigGroup general = config->group(QStringLiteral("General"));
     if (!general.hasKey(showStatusBar)) {

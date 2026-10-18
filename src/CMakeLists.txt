@@ -509,6 +509,8 @@ if (HAVE_KUSERFEEDBACK)
 endif()
 
 add_executable(dolphin)
+# Finder: install the program as "finder" so it sits beside the system Dolphin.
+set_target_properties(dolphin PROPERTIES OUTPUT_NAME finder)
 
 target_sources(dolphin PRIVATE
     dbusinterface.cpp

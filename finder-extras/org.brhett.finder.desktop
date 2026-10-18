@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Finder
+GenericName=File Manager
+Comment=Browse and manage your files
+Exec=/home/brhett/.local/opt/finder/bin/finder %u
+Icon=system-file-manager
+Terminal=false
+Categories=Qt;KDE;System;FileTools;FileManager;
+MimeType=inode/directory;
+StartupWMClass=finder
+Keywords=files;file manager;finder;browse;

@@ -73,7 +73,7 @@ int main(int argc, char **argv)
     KIconTheme::initTheme();
 
     QApplication app(argc, argv);
-    app.setWindowIcon(QIcon::fromTheme(QStringLiteral("org.kde.dolphin"), app.windowIcon()));
+    app.setWindowIcon(QIcon::fromTheme(QStringLiteral("system-file-manager"), app.windowIcon()));
 
 #if HAVE_STYLE_MANAGER
     /**
@@ -92,8 +92,10 @@ int main(int argc, char **argv)
 
     KLocalizedString::setApplicationDomain(dolphinTranslationDomain);
 
-    KAboutData aboutData(QStringLiteral("dolphin"),
-                         i18n("Dolphin"),
+    // Finder: a macOS-style build of Dolphin with its own name, settings
+    // (finderrc) and launcher, so it never collides with the system Dolphin.
+    KAboutData aboutData(QStringLiteral("finder"),
+                         QStringLiteral("Finder"),
                          QStringLiteral(DOLPHIN_VERSION_STRING),
                          i18nc("@title", "File Manager"),
                          KAboutLicense::GPL,
@@ -126,6 +128,7 @@ int main(int argc, char **argv)
     aboutData.addAuthor(i18nc("@info:credit", "Max Blazejak"), i18nc("@info:credit", "Developer"), QStringLiteral("m43ksrocks@gmail.com"));
     aboutData.addAuthor(i18nc("@info:credit", "Michael Austin"), i18nc("@info:credit", "Documentation"), QStringLiteral("tuxedup@users.sourceforge.net"));
 
+    aboutData.setDesktopFileName(QStringLiteral("org.brhett.finder"));
     KAboutData::setApplicationData(aboutData);
     KCrash::initialize();
 
@@ -246,7 +249,7 @@ int main(int argc, char **argv)
     // 3. There is a session available to restore
     if (app.isSessionRestored() || GeneralSettings::rememberOpenedTabs()) {
         // Get saved state data for the last-closed Dolphin instance
-        const QString serviceName = QStringLiteral("org.kde.dolphin-%1").arg(QCoreApplication::applicationPid());
+        const QString serviceName = QStringLiteral("org.brhett.finder-%1").arg(QCoreApplication::applicationPid());
         const auto instancesCount = Dolphin::dolphinGuiInstances(serviceName).size();
         if (instancesCount == 1 || (app.isSessionRestored() && instancesCount > 0)) {
             const QString className = KXmlGuiWindow::classNameOfToplevel(1);
