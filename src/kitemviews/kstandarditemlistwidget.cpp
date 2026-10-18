@@ -1716,32 +1716,27 @@ void KStandardItemListWidget::drawPixmap(QPainter *painter, const QPixmap &pixma
 
 void KStandardItemListWidget::drawSiblingsInformation(QPainter *painter)
 {
-    const int siblingSize = size().height();
-    const int x = (m_expansionArea.left() + m_expansionArea.right() - siblingSize) / 2;
-    QRect siblingRect(x, 0, siblingSize, siblingSize);
-
-    bool isItemSibling = true;
-
-    const QBitArray siblings = siblingsInformation();
-    QStyleOption option;
-    for (int i = siblings.count() - 1; i >= 0; --i) {
-        option.rect = siblingRect;
-        option.state = siblings.at(i) ? QStyle::State_Sibling : QStyle::State_None;
-        if (isItemSibling) {
-            option.state |= QStyle::State_Item;
-            if (m_isExpandable) {
-                option.state |= QStyle::State_Children;
-            }
-            if (data().value("isExpanded").toBool()) {
-                option.state |= QStyle::State_Open;
-            }
-            isItemSibling = false;
-        }
-
-        style()->drawPrimitive(QStyle::PE_IndicatorBranch, &option, painter);
-
-        siblingRect.translate(layoutDirection() == Qt::LeftToRight ? -siblingRect.width() : siblingRect.width(), 0);
+    // Finder: a small gray disclosure chevron (right when closed, down when
+    // open) instead of the style's tree branches.
+    if (!m_isExpandable) {
+        return;
     }
+    const bool open = data().value("isExpanded").toBool();
+    const QPointF c = m_expansionArea.center();
+    const qreal k = 3.0;
+    QPolygonF chevron;
+    if (open) {
+        chevron = {c + QPointF(-k, -k / 2), c + QPointF(0, k / 2), c + QPointF(k, -k / 2)};
+    } else if (layoutDirection() == Qt::LeftToRight) {
+        chevron = {c + QPointF(-k / 2, -k), c + QPointF(k / 2, 0), c + QPointF(-k / 2, k)};
+    } else {
+        chevron = {c + QPointF(k / 2, -k), c + QPointF(-k / 2, 0), c + QPointF(k / 2, k)};
+    }
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing);
+    painter->setPen(QPen(isSelected() ? QColor(255, 255, 255, 230) : QColor(255, 255, 255, 140), 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter->drawPolyline(chevron);
+    painter->restore();
 }
 
 QRectF KStandardItemListWidget::roleEditingRect(const QByteArray &role) const
@@ -1795,7 +1790,9 @@ QPixmap KStandardItemListWidget::pixmapForIcon(const QString &name, const QSize 
             icon = QIcon(name);
         }
         if (!icon.isNull()) {
-            pixmap = icon.pixmap(iconSize, dpr, mode);
+            // Finder: small icons are the full-color artwork scaled down;
+            // icon themes often ship monochrome outlines at 16-22 px.
+            pixmap = icon.pixmap(iconHeight < 32 ? QSize(32, 32) : iconSize, dpr, mode);
         }
         if (pixmap.isNull()) {
             icon = fallbackIcon;
