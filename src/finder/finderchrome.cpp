@@ -5,13 +5,16 @@
  */
 
 #include "finderchrome.h"
+#include "finderairdrop.h"
 #include "findercolumnview.h"
+#include "findersidebar.h"
 
 #include "dolphinmainwindow.h"
 #include "dolphinviewcontainer.h"
 #include "views/dolphinview.h"
 
 #include <KConfigGroup>
+#include <KFileItem>
 #include <KSharedConfig>
 
 #include <KUrlComboBox>
@@ -393,7 +396,18 @@ void FinderChrome::setToolBar(QToolBar *toolBar)
         connect(m_columnsAction, &QAction::triggered, this, [this]() {
             setColumnMode(true);
         });
+        // Go › AirDrop, with Finder's shortcut (⌘⇧R there, Ctrl+Shift+R here).
+        if (auto *xmlWindow = qobject_cast<KXmlGuiWindow *>(m_window)) {
+            QAction *airDrop = xmlWindow->actionCollection()->addAction(QStringLiteral("finder_airdrop"));
+            airDrop->setText(i18nc("@action Finder", "AirDrop"));
+            airDrop->setIcon(FinderAirDropView::icon(QColor(255, 255, 255, 225)));
+            KActionCollection::setDefaultShortcut(airDrop, QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_R));
+            connect(airDrop, &QAction::triggered, this, [this]() {
+                showAirDrop({});
+            });
+        }
         connect(qobject_cast<DolphinMainWindow *>(m_window), &DolphinMainWindow::urlChanged, this, [this]() {
+            hideAirDrop();
             if (m_columnMode) {
                 QTimer::singleShot(0, this, &FinderChrome::attachColumns);
             }
@@ -444,6 +458,48 @@ QIcon FinderChrome::columnsIcon()
         icon.addPixmap(pm);
     }
     return icon;
+}
+
+void FinderChrome::showAirDrop(const QList<QUrl> &files)
+{
+    auto *window = qobject_cast<DolphinMainWindow *>(m_window);
+    DolphinViewContainer *container = window ? window->activeViewContainer() : nullptr;
+    if (!container) {
+        return;
+    }
+    DolphinView *view = container->view();
+    if (!m_airDrop) {
+        m_airDrop = new FinderAirDropView(view);
+    }
+    if (m_airDrop->parentWidget() != view) {
+        m_airDrop->setParent(view);
+    }
+    view->removeEventFilter(this);
+    view->installEventFilter(this);
+    m_airDrop->setGeometry(view->rect());
+    m_airDrop->setPendingFiles(files);
+    m_airDrop->show();
+    m_airDrop->raise();
+    if (m_title) {
+        m_title->setText(i18nc("@title Finder window", "AirDrop"));
+    }
+    if (m_finderSidebar) {
+        m_finderSidebar->setUrl(FinderSidebar::AirDropUrl());
+    }
+}
+
+void FinderChrome::hideAirDrop()
+{
+    if (!m_airDrop || !m_airDrop->isVisible()) {
+        return;
+    }
+    m_airDrop->hide();
+    updateTitle();
+    auto *window = qobject_cast<DolphinMainWindow *>(m_window);
+    DolphinViewContainer *container = window ? window->activeViewContainer() : nullptr;
+    if (container && m_finderSidebar) {
+        m_finderSidebar->setUrl(container->url());
+    }
 }
 
 void FinderChrome::leaveColumnMode()
@@ -579,6 +635,22 @@ QToolButton *FinderChrome::createMoreButton(QToolBar *toolBar)
             return;
         }
         KActionCollection *ac = window->actionCollection();
+        // Finder's Share › AirDrop: send the selected files to a nearby device.
+        menu->addAction(FinderAirDropView::icon(QColor(255, 255, 255, 225)), i18nc("@action:inmenu Finder", "AirDrop…"), this, [this]() {
+            QList<QUrl> files;
+            if (auto *window = qobject_cast<DolphinMainWindow *>(m_window)) {
+                if (DolphinViewContainer *container = window->activeViewContainer()) {
+                    const KFileItemList selected = container->view()->selectedItems();
+                    for (const KFileItem &item : selected) {
+                        if (item.isLocalFile() && !item.isDir()) {
+                            files.append(item.url());
+                        }
+                    }
+                }
+            }
+            showAirDrop(files);
+        });
+        menu->addSeparator();
         const QList<QStringList> sections = {
             {QStringLiteral("create_dir"), QStringLiteral("new_menu")},
             {QStringLiteral("properties"), QStringLiteral("renamefile"), QStringLiteral("duplicate"), QStringLiteral("movetotrash")},
@@ -730,6 +802,17 @@ void FinderChrome::updateNavigatorVisibility()
 void FinderChrome::setSidebar(QWidget *sidebar)
 {
     m_sidebar = sidebar;
+    if (sidebar && !m_finderSidebar) {
+        m_finderSidebar = sidebar->findChild<FinderSidebar *>();
+        if (m_finderSidebar) {
+            connect(m_finderSidebar, &FinderSidebar::airDropRequested, this, [this]() {
+                showAirDrop({});
+            });
+            // Picking any place (even the folder already shown) closes AirDrop.
+            connect(m_finderSidebar, &FinderSidebar::placeActivated, this, &FinderChrome::hideAirDrop);
+            connect(m_finderSidebar, &FinderSidebar::tabRequested, this, &FinderChrome::hideAirDrop);
+        }
+    }
     if (sidebar) {
         sidebar->installEventFilter(this);
         // Only the window paints the glass; the dock itself stays clear.
@@ -860,9 +943,15 @@ bool FinderChrome::eventFilter(QObject *watched, QEvent *event)
         return false;
     }
 
-    if (m_columns && watched == m_columns->parentWidget() && event->type() == QEvent::Resize) {
-        m_columns->setGeometry(m_columns->parentWidget()->rect());
-        return false;
+    if (event->type() == QEvent::Resize && watched->isWidgetType()) {
+        // Keep the overlays (column view, AirDrop) covering the view.
+        auto *view = static_cast<QWidget *>(watched);
+        if (m_columns && view == m_columns->parentWidget()) {
+            m_columns->setGeometry(view->rect());
+        }
+        if (m_airDrop && view == m_airDrop->parentWidget()) {
+            m_airDrop->setGeometry(view->rect());
+        }
     }
 
     if (watched == m_title && event->type() == QEvent::MouseButtonPress) {

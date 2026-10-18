@@ -32,6 +32,9 @@ public:
     /** Highlights the place that best matches the folder being shown. */
     void setUrl(const QUrl &url);
 
+    /** The sidebar's AirDrop item; setUrl(AirDropUrl()) highlights it. */
+    static QUrl AirDropUrl();
+
     enum Roles {
         UrlRole = Qt::UserRole + 1,
         HeaderRole,
@@ -41,6 +44,8 @@ public:
 Q_SIGNALS:
     void placeActivated(const QUrl &url);
     void tabRequested(const QUrl &url);
+    /** The AirDrop item was clicked. */
+    void airDropRequested();
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;

@@ -5,6 +5,7 @@
  */
 
 #include "findersidebar.h"
+#include "finderairdrop.h"
 
 #include <KFilePlacesModel>
 #include <KLocalizedString>
@@ -102,7 +103,9 @@ public:
         }
 
         // Golden Gate: accent-colored sidebar icons while the window is active.
-        const QIcon icon = QIcon::fromTheme(index.data(Qt::DecorationRole).toString());
+        const QString iconName = index.data(Qt::DecorationRole).toString();
+        static const QIcon airDrop = FinderAirDropView::icon(Qt::white);
+        const QIcon icon = iconName == QLatin1String("finder-airdrop") ? airDrop : QIcon::fromTheme(iconName);
         const qreal dpr = p->device() ? p->device()->devicePixelRatioF() : 1.0;
         const QPixmap pm = tinted(icon, IconSize, dpr, active ? Accent : QColor(160, 160, 165));
         const int iconX = int(pill.left()) + 8;
@@ -218,11 +221,21 @@ void FinderSidebar::rebuild()
     }
     if (!locations.isEmpty()) {
         header(i18nc("@title Finder sidebar section", "Locations"));
+        // AirDrop leads Locations, as in Finder; it opens the AirDrop panel.
+        auto *airDrop = new QStandardItem(i18nc("@item:inlistbox Finder sidebar", "AirDrop"));
+        airDrop->setData(QStringLiteral("finder-airdrop"), Qt::DecorationRole);
+        airDrop->setData(AirDropUrl(), UrlRole);
+        m_model->appendRow(airDrop);
         for (auto *item : std::as_const(locations)) {
             m_model->appendRow(item);
         }
     }
     setUrl(m_url);
+}
+
+QUrl FinderSidebar::AirDropUrl()
+{
+    return QUrl(QStringLiteral("finder-airdrop:/"));
 }
 
 void FinderSidebar::setUrl(const QUrl &url)
@@ -249,6 +262,10 @@ QModelIndex FinderSidebar::placeIndex(const QModelIndex &row) const
 
 void FinderSidebar::activate(const QModelIndex &index, bool newTab)
 {
+    if (index.data(UrlRole).toUrl() == AirDropUrl()) {
+        Q_EMIT airDropRequested();
+        return;
+    }
     const QModelIndex place = placeIndex(index);
     if (!place.isValid()) {
         return;

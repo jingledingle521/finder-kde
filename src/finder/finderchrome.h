@@ -11,8 +11,11 @@
 #include <QObject>
 #include <QPointer>
 #include <QRegion>
+#include <QUrl>
 
+class FinderAirDropView;
 class FinderColumnView;
+class FinderSidebar;
 class KWindowShadow;
 class QMainWindow;
 class QAction;
@@ -58,6 +61,9 @@ private:
     void setColumnMode(bool on);
     void attachColumns();
     void leaveColumnMode();
+    /** Shows the AirDrop panel over the view; @p files are offered for sending. */
+    void showAirDrop(const QList<QUrl> &files);
+    void hideAirDrop();
     void updateTitleColor();
     void updateLead();
     void paintCapsules(QPainter &p);
@@ -79,6 +85,8 @@ private:
     QPointer<QAction> m_navigatorAction;
     QAction *m_columnsAction = nullptr;
     QPointer<FinderColumnView> m_columns;
+    QPointer<FinderAirDropView> m_airDrop;
+    QPointer<FinderSidebar> m_finderSidebar;
     bool m_columnMode = false;
     KWindowShadow *m_shadow = nullptr;
     QRegion m_appliedBlur; // last blur region sent to KWin
