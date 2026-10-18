@@ -12,6 +12,8 @@
 
 class KWindowShadow;
 class QMainWindow;
+class QAction;
+class QLabel;
 class QToolBar;
 class QWidget;
 
@@ -43,6 +45,9 @@ protected:
 
 private:
     void paintBackground();
+    void updateTitle();
+    void watchNavigators();
+    void updateNavigatorVisibility();
     void updateWindowEffects();
     void updateShadow();
     Qt::Edges edgesAt(const QPointF &pos) const;
@@ -53,6 +58,9 @@ private:
     QPointer<QToolBar> m_toolBar;
     QPointer<QWidget> m_sidebar;
     QPointer<QWidget> m_stoplights;
+    QPointer<QLabel> m_title;
+    QPointer<QWidget> m_navigator; // the hidden breadcrumb
+    QPointer<QAction> m_navigatorAction;
     KWindowShadow *m_shadow = nullptr;
     Qt::Edges m_cursorEdges;
 };
