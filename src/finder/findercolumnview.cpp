@@ -113,6 +113,13 @@ FinderColumnView::FinderColumnView(QWidget *parent)
     , m_model(new KDirModel(this))
     , m_proxy(new KDirSortFilterProxyModel(this))
 {
+    // Created first: setModel() below already calls currentChanged(), which uses it.
+    // The footer counts items, which arrive as folders list: update shortly after.
+    m_statusTimer = new QTimer(this);
+    m_statusTimer->setSingleShot(true);
+    m_statusTimer->setInterval(120);
+    connect(m_statusTimer, &QTimer::timeout, this, &FinderColumnView::currentFolderChanged);
+
     m_proxy->setSourceModel(m_model);
     m_proxy->setSortFoldersFirst(false); // Finder sorts folders and files together
     m_proxy->setSortCaseSensitivity(Qt::CaseInsensitive);
@@ -164,11 +171,6 @@ FinderColumnView::FinderColumnView(QWidget *parent)
 
     connect(this, &QAbstractItemView::activated, this, &FinderColumnView::openIndex);
 
-    // The footer counts items, which arrive as folders list: update shortly after.
-    m_statusTimer = new QTimer(this);
-    m_statusTimer->setSingleShot(true);
-    m_statusTimer->setInterval(120);
-    connect(m_statusTimer, &QTimer::timeout, this, &FinderColumnView::currentFolderChanged);
     connect(m_proxy, &QAbstractItemModel::rowsInserted, m_statusTimer, qOverload<>(&QTimer::start));
     connect(m_proxy, &QAbstractItemModel::rowsRemoved, m_statusTimer, qOverload<>(&QTimer::start));
 }
@@ -185,7 +187,9 @@ void FinderColumnView::setShowHiddenFiles(bool show)
 void FinderColumnView::currentChanged(const QModelIndex &current, const QModelIndex &previous)
 {
     QColumnView::currentChanged(current, previous);
-    m_statusTimer->start();
+    if (m_statusTimer) {
+        m_statusTimer->start();
+    }
 }
 
 QUrl FinderColumnView::currentFolder() const

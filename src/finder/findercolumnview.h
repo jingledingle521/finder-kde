@@ -63,7 +63,7 @@ private:
     KDirModel *m_model;
     KDirSortFilterProxyModel *m_proxy;
     QUrl m_root;
-    QTimer *m_statusTimer; // coalesces footer updates while folders list
+    QTimer *m_statusTimer = nullptr; // coalesces footer updates while folders list
 
     QWidget *m_preview;
     QLabel *m_previewIcon;
