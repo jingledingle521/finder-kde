@@ -51,6 +51,8 @@ if ! cmp -s "$root/finder-extras/finder.portal" "$portal"; then
     pkexec install -m 644 "$root/finder-extras/finder.portal" "$portal" \
         || echo "Skipped the Finder file chooser: $portal needs installing as root."
 fi
+# The session bus only notices the new D-Bus service file after a reload.
+busctl --user call org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus ReloadConfig >/dev/null 2>&1 || true
 systemctl --user restart xdg-desktop-portal.service 2>/dev/null || true
 
 echo "Finder installed. Launch it from the app menu, or: $prefix/bin/finder"
