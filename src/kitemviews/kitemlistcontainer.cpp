@@ -18,6 +18,8 @@
 #include <QApplication>
 #include <QFontMetrics>
 #include <QGraphicsScene>
+#include <QLinearGradient>
+#include <QPainter>
 #include <QGraphicsView>
 #include <QScrollBar>
 #include <QScroller>
@@ -61,6 +63,26 @@ void KItemListContainerViewport::wheelEvent(QWheelEvent *event)
     event->ignore();
 }
 
+namespace
+{
+/** Finder's scroll edge: items fade out as they scroll up toward the toolbar. */
+class ScrollEdgeFade : public QWidget
+{
+public:
+    using QWidget::QWidget;
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter p(this);
+        QLinearGradient fade(0, 0, 0, height());
+        fade.setColorAt(0, QColor(32, 32, 37, 245)); // Finder's content color
+        fade.setColorAt(1, QColor(32, 32, 37, 0));
+        p.fillRect(rect(), fade);
+    }
+};
+}
+
 KItemListContainer::KItemListContainer(KItemListController *controller, QWidget *parent)
     : QAbstractScrollArea(parent)
     , m_controller(controller)
@@ -74,6 +96,15 @@ KItemListContainer::KItemListContainer(KItemListController *controller, QWidget 
     QGraphicsView *graphicsView = new KItemListContainerViewport(new QGraphicsScene(this), this);
     setViewport(graphicsView);
     setFrameShape(QFrame::NoFrame); // Finder: no box around the files
+
+    auto *fade = new ScrollEdgeFade(this);
+    fade->setObjectName(QStringLiteral("finderScrollEdge"));
+    fade->setAttribute(Qt::WA_TransparentForMouseEvents);
+    fade->hide();
+    connect(verticalScrollBar(), &QScrollBar::valueChanged, fade, [fade](int value) {
+        fade->setVisible(value > 0);
+        fade->raise();
+    });
 
     m_horizontalSmoothScroller = new KItemListSmoothScroller(horizontalScrollBar(), this);
     m_verticalSmoothScroller = new KItemListSmoothScroller(verticalScrollBar(), this);
@@ -172,6 +203,9 @@ void KItemListContainer::showEvent(QShowEvent *event)
 void KItemListContainer::resizeEvent(QResizeEvent *event)
 {
     QAbstractScrollArea::resizeEvent(event);
+    if (auto *fade = findChild<QWidget *>(QStringLiteral("finderScrollEdge"), Qt::FindDirectChildrenOnly)) {
+        fade->setGeometry(0, 0, viewport()->width(), 28);
+    }
     updateGeometries();
 }
 

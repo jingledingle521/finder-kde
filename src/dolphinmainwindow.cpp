@@ -146,7 +146,8 @@ DolphinMainWindow::DolphinMainWindow()
 #ifndef Q_OS_WIN
     setWindowFlags(Qt::WindowContextHelpButtonHint);
 #endif
-    setComponentName(QStringLiteral("dolphin"), QGuiApplication::applicationDisplayName());
+    // Finder: its own component, so it never reads or writes stock Dolphin's layout.
+    setComponentName(QStringLiteral("finder"), QGuiApplication::applicationDisplayName());
     setObjectName(QStringLiteral("Dolphin#"));
 
     setStateConfigGroup("State");
@@ -251,7 +252,8 @@ DolphinMainWindow::DolphinMainWindow()
     hamburgerMenu->setShowMenuBarAction(showMenuBarAction);
     connect(hamburgerMenu, &KHamburgerMenu::aboutToShowMenu, this, &DolphinMainWindow::updateHamburgerMenu);
     hamburgerMenu->hideActionsOf(toolBar());
-    if (GeneralSettings::version() < 201 && !toolBar()->actions().contains(hamburgerMenu)) {
+    // Finder: the "…" button and the global menu replace the hamburger menu.
+    if (false && GeneralSettings::version() < 201 && !toolBar()->actions().contains(hamburgerMenu)) {
         addHamburgerMenuToToolbar();
     }
 

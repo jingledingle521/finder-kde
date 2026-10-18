@@ -7,6 +7,7 @@
 #ifndef FINDERCHROME_H
 #define FINDERCHROME_H
 
+#include <QIcon>
 #include <QObject>
 #include <QPointer>
 
@@ -16,6 +17,7 @@ class QAction;
 class QLabel;
 class QPainter;
 class QToolBar;
+class QToolButton;
 class QWidget;
 
 /**
@@ -47,6 +49,8 @@ protected:
 private:
     void paintBackground();
     void updateTitle();
+    QToolButton *createMoreButton(QToolBar *toolBar);
+    static QIcon groupIcon();
     void updateTitleColor();
     void updateLead();
     void paintCapsules(QPainter &p);

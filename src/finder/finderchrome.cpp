@@ -12,6 +12,10 @@
 #include <QLineEdit>
 #include <KWindowEffects>
 #include <KWindowShadow>
+#include <KActionCollection>
+#include <KLocalizedString>
+#include <KXmlGuiWindow>
+#include <QMenu>
 
 #include <QApplication>
 #include <QGuiApplication>
@@ -310,7 +314,22 @@ void FinderChrome::setToolBar(QToolBar *toolBar)
     };
     for (QAction *action : actions) {
         const QString name = action->objectName();
-        if (name == QLatin1String("icons") || name == QLatin1String("toggle_search")) {
+        if (name == QLatin1String("icons") || name == QLatin1String("group_by") || name == QLatin1String("toggle_search")) {
+            toolBar->insertWidget(action, gap(CapsuleGap + 2 * CapsulePad));
+        }
+        if (name == QLatin1String("group_by")) {
+            // Finder's grouping control opens its menu on click.
+            if (auto *button = qobject_cast<QToolButton *>(toolBar->widgetForAction(action))) {
+                button->setPopupMode(QToolButton::InstantPopup);
+                button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+                button->setIcon(groupIcon());
+                button->setMinimumWidth(52);
+            }
+        }
+        if (name == QLatin1String("toggle_search")) {
+            // Finder's "…" action menu, between grouping and search.
+            QAction *more = toolBar->insertWidget(action, createMoreButton(toolBar));
+            more->setObjectName(QStringLiteral("finder_more"));
             toolBar->insertWidget(action, gap(CapsuleGap + 2 * CapsulePad));
         }
         if (name == QLatin1String("go_back")) {
@@ -355,6 +374,86 @@ void FinderChrome::setToolBar(QToolBar *toolBar)
     connect(m_window, &QWidget::windowTitleChanged, this, &FinderChrome::updateTitle, Qt::UniqueConnection);
     updateTitle();
     watchNavigators();
+}
+
+QIcon FinderChrome::groupIcon()
+{
+    // Finder's grouping control: a small grid of items and a chevron.
+    QIcon icon;
+    for (const qreal dpr : {1.0, 1.5, 2.0}) {
+        // Drawn on a 16 px grid, sized like the toolbar's 22 px icons.
+        QPixmap pm(QSize(22, 22) * dpr);
+        pm.setDevicePixelRatio(dpr);
+        pm.fill(Qt::transparent);
+        QPainter p(&pm);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.scale(22.0 / 16.0, 22.0 / 16.0);
+        const QColor ink(255, 255, 255, 225);
+        p.setPen(QPen(ink, 1.0));
+        p.setBrush(Qt::NoBrush);
+        for (int row = 0; row < 2; ++row) {
+            for (int col = 0; col < 2; ++col) {
+                p.drawRoundedRect(QRectF(0.8 + col * 5.6, 2.8 + row * 5.6, 4.0, 4.0), 1.1, 1.1);
+            }
+        }
+        p.setPen(QPen(ink, 1.1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        p.drawPolyline(QPolygonF{QPointF(12.2, 7.0), QPointF(13.8, 8.6), QPointF(15.4, 7.0)});
+        p.end();
+        icon.addPixmap(pm);
+    }
+    return icon;
+}
+
+QToolButton *FinderChrome::createMoreButton(QToolBar *toolBar)
+{
+    auto *button = new QToolButton(toolBar);
+    // Three horizontal dots, drawn so they don't depend on the icon theme.
+    QIcon dots;
+    for (const qreal dpr : {1.0, 1.5, 2.0}) {
+        QPixmap pm(QSize(16, 16) * dpr);
+        pm.setDevicePixelRatio(dpr);
+        pm.fill(Qt::transparent);
+        QPainter p(&pm);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(255, 255, 255, 225));
+        for (const qreal x : {3.0, 8.0, 13.0}) {
+            p.drawEllipse(QPointF(x, 8), 1.6, 1.6);
+        }
+        p.end();
+        dots.addPixmap(pm);
+    }
+    button->setIcon(dots);
+    button->setToolTip(i18nc("@info:tooltip Finder toolbar", "Show actions for the selected items"));
+    button->setPopupMode(QToolButton::InstantPopup);
+    auto *menu = new QMenu(button);
+    button->setMenu(menu);
+    connect(menu, &QMenu::aboutToShow, this, [this, menu]() {
+        // Rebuilt each time so it follows the current selection.
+        menu->clear();
+        auto *window = qobject_cast<KXmlGuiWindow *>(m_window);
+        if (!window) {
+            return;
+        }
+        KActionCollection *ac = window->actionCollection();
+        const QList<QStringList> sections = {
+            {QStringLiteral("create_dir"), QStringLiteral("new_menu")},
+            {QStringLiteral("properties"), QStringLiteral("renamefile"), QStringLiteral("duplicate"), QStringLiteral("movetotrash")},
+            {QStringLiteral("edit_copy"), QStringLiteral("copy_location"), QStringLiteral("edit_paste")},
+            {QStringLiteral("sort"), QStringLiteral("show_hidden_files"), QStringLiteral("open_terminal_here")},
+        };
+        for (const QStringList &section : sections) {
+            if (!menu->isEmpty()) {
+                menu->addSeparator();
+            }
+            for (const QString &name : section) {
+                if (QAction *action = ac->action(name); action && action->isVisible()) {
+                    menu->addAction(action);
+                }
+            }
+        }
+    });
+    return button;
 }
 
 void FinderChrome::updateTitle()
@@ -407,6 +506,8 @@ void FinderChrome::paintCapsules(QPainter &p)
     static const QList<QStringList> groups = {
         {QStringLiteral("go_back"), QStringLiteral("go_forward")},
         {QStringLiteral("icons"), QStringLiteral("compact"), QStringLiteral("details")},
+        {QStringLiteral("group_by")},
+        {QStringLiteral("finder_more")},
         {QStringLiteral("toggle_search")},
     };
     p.setRenderHint(QPainter::Antialiasing);
