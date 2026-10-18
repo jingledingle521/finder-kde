@@ -46,6 +46,12 @@ KItemListContainerViewport::KItemListContainerViewport(QGraphicsScene *scene, QW
     setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     setViewportMargins(0, 0, 0, 0);
     setFrameShape(QFrame::NoFrame);
+    // Finder: the window paints the content background.
+    QPalette pal = palette();
+    pal.setColor(QPalette::Base, Qt::transparent);
+    setPalette(pal);
+    setBackgroundBrush(Qt::NoBrush);
+    viewport()->setAutoFillBackground(false);
 }
 
 void KItemListContainerViewport::wheelEvent(QWheelEvent *event)
@@ -67,6 +73,7 @@ KItemListContainer::KItemListContainer(KItemListController *controller, QWidget 
 
     QGraphicsView *graphicsView = new KItemListContainerViewport(new QGraphicsScene(this), this);
     setViewport(graphicsView);
+    setFrameShape(QFrame::NoFrame); // Finder: no box around the files
 
     m_horizontalSmoothScroller = new KItemListSmoothScroller(horizontalScrollBar(), this);
     m_verticalSmoothScroller = new KItemListSmoothScroller(verticalScrollBar(), this);

@@ -533,8 +533,10 @@ bool FinderChrome::eventFilter(QObject *watched, QEvent *event)
     if (watched == m_window) {
         switch (event->type()) {
         case QEvent::Paint:
+            // The window paints only our background; QMainWindow's own paint
+            // would lay the style's window color over the glass.
             paintBackground();
-            break;
+            return true;
         case QEvent::ChildPolished:
             // KXMLGUI rebuilds toolbars (e.g. after loading saved settings);
             // move the stoplights to the new one.

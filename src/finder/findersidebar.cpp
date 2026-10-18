@@ -77,7 +77,7 @@ public:
         p->save();
         p->setRenderHint(QPainter::Antialiasing);
         const QRect r = option.rect;
-        const bool active = option.state & QStyle::State_Active;
+        const bool active = option.widget ? option.widget->isActiveWindow() : bool(option.state & QStyle::State_Active);
 
         if (index.data(FinderSidebar::HeaderRole).toBool()) {
             QFont f = option.font;

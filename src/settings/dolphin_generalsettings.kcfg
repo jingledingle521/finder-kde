@@ -152,7 +152,7 @@
         </entry>
         <entry name="ShowZoomSlider" type="Bool">
             <label>Show zoom slider in the statusbar</label>
-            <default>false</default>
+            <default>true</default>
         </entry>
         <entry name="LockPanels" type="Bool">
             <label>Lock the layout of the panels</label>
