@@ -5,16 +5,32 @@
  */
 
 #include "findercolumnview.h"
+#include "finderairdrop.h"
+#include "finderairdropservice.h"
 
 #include <KDirLister>
 #include <KDirModel>
 #include <KDirSortFilterProxyModel>
 #include <KFileItem>
+#include <KFileItemActions>
+#include <KFileItemListProperties>
+#include <KIO/DeleteOrTrashJob>
 #include <KIO/JobUiDelegateFactory>
+#include <KIO/MkdirJob>
 #include <KIO/OpenUrlJob>
+#include <KIO/Paste>
+#include <KIO/PasteJob>
+#include <KIO/RenameFileDialog>
 #include <KLocalizedString>
+#include <KPropertiesDialog>
+#include <KUrlMimeData>
 
 #include <QApplication>
+#include <QClipboard>
+#include <QInputDialog>
+#include <QMenu>
+#include <QMimeData>
+#include <QTimer>
 #include <QLabel>
 #include <QListView>
 #include <QPainter>
@@ -147,6 +163,152 @@ FinderColumnView::FinderColumnView(QWidget *parent)
     connect(this, &QColumnView::updatePreviewWidget, this, &FinderColumnView::updatePreview);
 
     connect(this, &QAbstractItemView::activated, this, &FinderColumnView::openIndex);
+
+    // The footer counts items, which arrive as folders list: update shortly after.
+    m_statusTimer = new QTimer(this);
+    m_statusTimer->setSingleShot(true);
+    m_statusTimer->setInterval(120);
+    connect(m_statusTimer, &QTimer::timeout, this, &FinderColumnView::currentFolderChanged);
+    connect(m_proxy, &QAbstractItemModel::rowsInserted, m_statusTimer, qOverload<>(&QTimer::start));
+    connect(m_proxy, &QAbstractItemModel::rowsRemoved, m_statusTimer, qOverload<>(&QTimer::start));
+}
+
+void FinderColumnView::setShowHiddenFiles(bool show)
+{
+    KDirLister *lister = m_model->dirLister();
+    if (lister->showHiddenFiles() != show) {
+        lister->setShowHiddenFiles(show);
+        lister->emitChanges();
+    }
+}
+
+void FinderColumnView::currentChanged(const QModelIndex &current, const QModelIndex &previous)
+{
+    QColumnView::currentChanged(current, previous);
+    m_statusTimer->start();
+}
+
+QUrl FinderColumnView::currentFolder() const
+{
+    // The folder of the active column: the one holding the current item.
+    const QModelIndex current = currentIndex();
+    if (!current.isValid() || !current.parent().isValid()) {
+        return m_root;
+    }
+    return itemAt(current.parent()).url();
+}
+
+QString FinderColumnView::statusText() const
+{
+    const QModelIndex current = currentIndex();
+    const QModelIndex folder = current.isValid() ? current.parent() : rootIndex();
+    const int count = m_proxy->rowCount(folder);
+    int selected = 0;
+    for (const QModelIndex &index : selectionModel()->selectedIndexes()) {
+        if (index.parent() == folder) {
+            ++selected;
+        }
+    }
+    if (selected > 0) {
+        return i18nc("@info:status Finder", "%1 of %2 selected", selected, count);
+    }
+    return i18ncp("@info:status Finder", "1 item", "%1 items", count);
+}
+
+void FinderColumnView::showContextMenu(QAbstractItemView *column, const QPoint &pos)
+{
+    const QModelIndex clicked = column->indexAt(pos);
+    QMenu menu(this);
+
+    if (clicked.isValid()) {
+        // Right-clicking an unselected item selects it alone, as in Finder.
+        if (!selectionModel()->isSelected(clicked)) {
+            setCurrentIndex(clicked);
+        }
+        KFileItemList items;
+        QList<QUrl> files;
+        for (const QModelIndex &index : selectionModel()->selectedIndexes()) {
+            if (index.parent() == clicked.parent()) {
+                const KFileItem item = itemAt(index);
+                items.append(item);
+                if (item.isLocalFile() && item.isFile()) {
+                    files.append(item.url());
+                }
+            }
+        }
+        if (items.isEmpty()) {
+            return;
+        }
+
+        menu.addAction(QIcon::fromTheme(QStringLiteral("document-open")), i18nc("@action:inmenu", "Open"), this, [this, clicked]() {
+            openIndex(clicked);
+        });
+        auto *actions = new KFileItemActions(&menu);
+        actions->setParentWidget(window());
+        actions->setItemListProperties(KFileItemListProperties(items));
+        actions->insertOpenWithActionsTo(nullptr, &menu, QStringList());
+        if (!files.isEmpty() && files.size() == items.size()) {
+            QMenu *share = menu.addMenu(QIcon::fromTheme(QStringLiteral("document-share")), i18nc("@action:inmenu Finder", "Share"));
+            share->addAction(FinderAirDropView::icon(QColor(0x0a, 0x84, 0xff)), i18nc("@action:inmenu Finder", "AirDrop…"), this, [this, files]() {
+                FinderAirDrop::instance()->share(files, window());
+            });
+        }
+        menu.addSeparator();
+        menu.addAction(QIcon::fromTheme(QStringLiteral("document-properties")), i18nc("@action:inmenu Finder", "Get Info"), this, [this, items]() {
+            KPropertiesDialog::showDialog(items, window(), false);
+        });
+        menu.addAction(QIcon::fromTheme(QStringLiteral("edit-rename")), i18nc("@action:inmenu", "Rename…"), this, [this, items]() {
+            auto *dialog = new KIO::RenameFileDialog(items, window());
+            dialog->setAttribute(Qt::WA_DeleteOnClose);
+            dialog->open();
+        });
+        menu.addAction(QIcon::fromTheme(QStringLiteral("user-trash")), i18nc("@action:inmenu", "Move to Trash"), this, [items]() {
+            auto *job = new KIO::DeleteOrTrashJob(items.urlList(), KIO::AskUserActionInterface::Trash, KIO::AskUserActionInterface::DefaultConfirmation, nullptr);
+            job->start();
+        });
+        menu.addSeparator();
+        menu.addAction(QIcon::fromTheme(QStringLiteral("edit-copy")), i18nc("@action:inmenu", "Copy"), this, [items]() {
+            auto *data = new QMimeData;
+            QList<QUrl> local;
+            for (const KFileItem &item : items) {
+                local.append(item.mostLocalUrl());
+            }
+            KUrlMimeData::setUrls(items.urlList(), local, data);
+            QApplication::clipboard()->setMimeData(data);
+        });
+        menu.addAction(QIcon::fromTheme(QStringLiteral("edit-copy-path")), i18nc("@action:inmenu", "Copy Location"), this, [items]() {
+            QStringList paths;
+            for (const KFileItem &item : items) {
+                paths.append(item.isLocalFile() ? item.localPath() : item.url().toDisplayString());
+            }
+            QApplication::clipboard()->setText(paths.join(QLatin1Char('\n')));
+        });
+    } else {
+        // Empty space: actions on the folder this column shows.
+        const QModelIndex root = column->rootIndex();
+        const KFileItem folder = root.isValid() ? itemAt(root) : m_model->dirLister()->rootItem();
+        const QUrl url = root.isValid() ? folder.url() : m_root;
+        menu.addAction(QIcon::fromTheme(QStringLiteral("folder-new")), i18nc("@action:inmenu", "New Folder…"), this, [this, url]() {
+            bool ok = false;
+            const QString name = QInputDialog::getText(window(), i18nc("@title:window", "New Folder"), i18nc("@label", "Name:"), QLineEdit::Normal,
+                                                       i18nc("@item default folder name", "untitled folder"), &ok);
+            if (ok && !name.trimmed().isEmpty()) {
+                KIO::mkdir(QUrl(url.toString() + QLatin1Char('/') + name.trimmed()))->start();
+            }
+        });
+        QAction *paste = menu.addAction(QIcon::fromTheme(QStringLiteral("edit-paste")), i18nc("@action:inmenu", "Paste"), this, [this, url]() {
+            KIO::PasteJob *job = KIO::paste(QApplication::clipboard()->mimeData(), url);
+            job->setUiDelegate(KIO::createDefaultJobUiDelegate(KJobUiDelegate::AutoHandlingEnabled, window()));
+        });
+        paste->setEnabled(QApplication::clipboard()->mimeData() && QApplication::clipboard()->mimeData()->hasUrls());
+        menu.addSeparator();
+        if (!folder.isNull()) {
+            menu.addAction(QIcon::fromTheme(QStringLiteral("document-properties")), i18nc("@action:inmenu Finder", "Get Info"), this, [this, folder]() {
+                KPropertiesDialog::showDialog(folder, window(), false);
+            });
+        }
+    }
+    menu.exec(column->viewport()->mapToGlobal(pos));
 }
 
 void FinderColumnView::setRootUrl(const QUrl &url)
@@ -180,6 +342,10 @@ QAbstractItemView *FinderColumnView::createColumn(const QModelIndex &rootIndex)
     }
     // Repaint the selection when focus moves between columns (blue ↔ gray).
     column->installEventFilter(this);
+    column->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(column, &QWidget::customContextMenuRequested, this, [this, column](const QPoint &pos) {
+        showContextMenu(column, pos);
+    });
     return column;
 }
 

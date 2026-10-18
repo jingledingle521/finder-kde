@@ -13,6 +13,7 @@
 
 #include "dolphinmainwindow.h"
 #include "dolphinviewcontainer.h"
+#include "statusbar/dolphinstatusbar.h"
 #include "views/dolphinview.h"
 
 #include <KConfigGroup>
@@ -556,9 +557,37 @@ void FinderChrome::setColumnMode(bool on)
         attachColumns();
     } else if (m_columns) {
         m_columns->hide();
+        updateTitle();
         if (auto *window = qobject_cast<DolphinMainWindow *>(m_window)) {
             if (DolphinViewContainer *container = window->activeViewContainer()) {
                 container->view()->setFocus();
+                // Hand the footer back to Dolphin's view.
+                if (auto *statusBar = container->findChild<DolphinStatusBar *>()) {
+                    statusBar->setUrl(container->url());
+                }
+                container->view()->requestStatusBarText();
+            }
+        }
+    }
+}
+
+void FinderChrome::updateColumnStatus()
+{
+    if (!m_columnMode || !m_columns || !m_columns->isVisible()) {
+        return;
+    }
+    const QUrl folder = m_columns->currentFolder();
+    // The title names the folder being worked in; the first column keeps the window's title.
+    if (folder == m_columns->rootUrl()) {
+        updateTitle();
+    } else if (m_title) {
+        m_title->setText(folder.fileName().isEmpty() ? folder.toDisplayString(QUrl::PreferLocalFile) : folder.fileName());
+    }
+    if (auto *window = qobject_cast<DolphinMainWindow *>(m_window)) {
+        if (DolphinViewContainer *container = window->activeViewContainer()) {
+            if (auto *statusBar = container->findChild<DolphinStatusBar *>()) {
+                statusBar->setUrl(folder);
+                statusBar->setDefaultText(m_columns->statusText());
             }
         }
     }
@@ -581,6 +610,12 @@ void FinderChrome::attachColumns()
                 }
             }
         });
+        connect(m_columns, &FinderColumnView::currentFolderChanged, this, &FinderChrome::updateColumnStatus);
+        // Hidden files follow View › Show Hidden Files.
+        if (QAction *hidden = window->actionCollection()->action(QStringLiteral("show_hidden_files"))) {
+            m_columns->setShowHiddenFiles(hidden->isChecked());
+            connect(hidden, &QAction::toggled, m_columns, &FinderColumnView::setShowHiddenFiles);
+        }
     }
     if (m_columns->parentWidget() != view) {
         m_columns->setParent(view);

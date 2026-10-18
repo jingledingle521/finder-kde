@@ -62,6 +62,8 @@ private:
     void setColumnMode(bool on);
     void attachColumns();
     void leaveColumnMode();
+    /** Title and footer follow the folder being worked in, in the column view. */
+    void updateColumnStatus();
     /** Shows the AirDrop panel over the view; @p files are offered for sending. */
     void showAirDrop(const QList<QUrl> &files);
     void hideAirDrop();
