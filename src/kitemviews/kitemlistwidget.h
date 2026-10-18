@@ -219,6 +219,12 @@ protected:
     virtual void siblingsInformationChanged(const QBitArray &current, const QBitArray &previous);
     virtual void editedRoleChanged(const QByteArray &current, const QByteArray &previous);
     virtual void iconSizeChanged(int current, int previous);
+
+    /**
+     * Finder: paints the selection in Finder's style instead of the style's
+     * item panel. Returns true if it painted (then no hover/focus is drawn).
+     */
+    virtual bool paintFinderHighlight(QPainter *painter, QWidget *widget, bool selected);
     void resizeEvent(QGraphicsSceneResizeEvent *event) override;
     void clearHoverCache();
 

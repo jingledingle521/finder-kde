@@ -751,6 +751,14 @@ void FinderChrome::paintBackground()
     }
 
 
+    // A hairline above Finder's footer (Dolphin's status bar).
+    for (QWidget *child : m_window->findChildren<QWidget *>()) {
+        if (child->isVisible() && qstrcmp(child->metaObject()->className(), "DolphinStatusBar") == 0) {
+            const QPoint top = child->mapTo(m_window, QPoint(0, 0));
+            p.fillRect(QRectF(top.x(), top.y(), child->width(), 1), QColor(0, 0, 0, 120));
+        }
+    }
+
     // Light inner edge around the whole window, like macOS's window border.
     p.setClipping(false);
     if (radius() > 0) {

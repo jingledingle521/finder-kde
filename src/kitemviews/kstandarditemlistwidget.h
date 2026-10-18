@@ -118,6 +118,8 @@ public:
     static KItemListWidgetInformant *createInformant();
 
 protected:
+    bool paintFinderHighlight(QPainter *painter, QWidget *widget, bool selected) override;
+
     /**
      * Invalidates the cache which results in calling KStandardItemListWidget::refreshCache() as
      * soon as the item need to gets repainted.

@@ -129,6 +129,10 @@ void KItemListWidget::paint(QPainter *painter, const QStyleOptionGraphicsItem *o
         painter->restore();
     }
 
+    if (paintFinderHighlight(painter, widget, (m_selected || m_clickHighlighted) && m_editedRole.isEmpty())) {
+        return;
+    }
+
     const QStyle::State selectedState(m_selected ? QStyle::State_Selected : QStyle::State(0));
     if ((m_selected || m_current) && m_editedRole.isEmpty()) {
         const QStyle::State activeState(isActiveWindow() && widget->hasFocus() ? QStyle::State_Active : 0);
@@ -155,6 +159,14 @@ void KItemListWidget::paint(QPainter *painter, const QStyleOptionGraphicsItem *o
         painter->drawPixmap(0, 0, *m_hoverCache);
         painter->setOpacity(opacity);
     }
+}
+
+bool KItemListWidget::paintFinderHighlight(QPainter *painter, QWidget *widget, bool selected)
+{
+    Q_UNUSED(painter)
+    Q_UNUSED(widget)
+    Q_UNUSED(selected)
+    return false;
 }
 
 void KItemListWidget::setVisibleRoles(const QList<QByteArray> &roles)

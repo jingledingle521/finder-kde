@@ -25,6 +25,7 @@
 #include <QGraphicsSceneResizeEvent>
 #include <QGraphicsView>
 #include <QPixmapCache>
+#include <QRegularExpression>
 #include <QStyleOption>
 #include <QTextBoundaryFinder>
 #include <QVariantAnimation>
@@ -475,6 +476,45 @@ void KStandardItemListWidget::paint(QPainter *painter, const QStyleOptionGraphic
 #endif
 }
 
+bool KStandardItemListWidget::paintFinderHighlight(QPainter *painter, QWidget *widget, bool selected)
+{
+    // Finder: no hover or focus marks; a selected item gets a gray tile behind
+    // its icon and a blue pill behind its name (a blue row in list view).
+    // Without keyboard focus the blue turns gray.
+    if (!selected) {
+        return true;
+    }
+    triggerCacheRefreshing();
+    const bool focused = isActiveWindow() && widget->hasFocus();
+    const QColor accent = focused ? QColor(0x0a, 0x84, 0xff) : QColor(255, 255, 255, 46);
+
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing);
+    painter->setPen(Qt::NoPen);
+    if (m_layout == DetailsLayout) {
+        painter->setBrush(accent);
+        painter->drawRoundedRect(selectionRectFull().adjusted(2, 0, -2, 0), 6, 6);
+    } else {
+        painter->setBrush(QColor(255, 255, 255, 30));
+        painter->drawRoundedRect(m_iconRect.adjusted(-5, -5, 5, 5), 7, 7);
+        if (const TextInfo *name = m_textInfo.value("text")) {
+            static const QRegularExpression lineBreak(QStringLiteral("[\\x{2028}\\n]"));
+            qreal width = 0;
+            const QStringList lines = name->staticText.text().split(lineBreak);
+            for (const QString &line : lines) {
+                width = std::max(width, qreal(m_customizedFontMetrics.horizontalAdvance(line)));
+            }
+            width = std::min(width, m_textRect.width());
+            const qreal height = name->staticText.size().height();
+            const qreal left = m_layout == IconsLayout ? m_textRect.center().x() - width / 2 : name->pos.x();
+            painter->setBrush(accent);
+            painter->drawRoundedRect(QRectF(left - 5, name->pos.y() - 1, width + 10, height + 2), 5, 5);
+        }
+    }
+    painter->restore();
+    return true;
+}
+
 QRectF KStandardItemListWidget::textRect() const
 {
     const_cast<KStandardItemListWidget *>(this)->triggerCacheRefreshing();
@@ -719,6 +759,9 @@ QColor KStandardItemListWidget::textColor(const QWidget &widget) const
     }
 
     const QPalette::ColorGroup group = isActiveWindow() && widget.hasFocus() ? QPalette::Active : QPalette::Inactive;
+    if (isSelected() && group == QPalette::Active) {
+        return Qt::white; // on Finder's blue selection
+    }
     const QPalette::ColorRole role = normalTextColorRole();
     return styleOption().palette.color(group, role);
 }

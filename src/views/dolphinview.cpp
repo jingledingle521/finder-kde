@@ -743,9 +743,7 @@ void DolphinView::requestStatusBarText()
             }
         }
 
-        if (folderCount + fileCount == 1) {
-            // If only one item is selected, show info about it
-            Q_EMIT statusBarTextChanged(list.first().getStatusBarInfo());
+        if (false) { // Finder: one selected item reads "1 of N selected" too
         } else {
             // At least 2 items are selected
             emitStatusBarText(folderCount, fileCount, totalFileSize, HasSelection);
