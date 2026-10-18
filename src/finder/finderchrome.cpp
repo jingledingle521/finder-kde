@@ -782,14 +782,23 @@ bool FinderChrome::eventFilter(QObject *watched, QEvent *event)
     if (watched == m_window->windowHandle()) {
         // Resizing from the window edges (there is no window frame to grab).
         switch (event->type()) {
-        case QEvent::Expose:
         case QEvent::PlatformSurface:
-            // The Wayland surface exists only once the window is exposed;
-            // effects requested earlier may not have stuck.
-            QTimer::singleShot(0, this, [this]() {
-                updateWindowEffects();
-                updateShadow();
-            });
+            // A new native surface has none of our effects yet.
+            m_surfaceReady = false;
+            m_appliedBlur = QRegion();
+            m_blurApplied = false;
+            break;
+        case QEvent::Expose:
+            // The Wayland surface exists only once the window is exposed, so
+            // apply the effects then, but only once per surface: Expose fires
+            // often, and re-sending them each time floods the compositor.
+            if (!m_surfaceReady && m_window->windowHandle()->isExposed()) {
+                m_surfaceReady = true;
+                QTimer::singleShot(0, this, [this]() {
+                    updateWindowEffects();
+                    updateShadow();
+                });
+            }
             break;
         case QEvent::MouseMove: {
             auto *e = static_cast<QMouseEvent *>(event);
@@ -883,7 +892,12 @@ void FinderChrome::updateWindowEffects()
         const QPolygon shape = roundedPath(QRectF(m_window->rect()), radius()).toFillPolygon().toPolygon();
         blur = QRegion(strip).intersected(QRegion(shape));
     }
+    if (m_blurApplied && blur == m_appliedBlur) {
+        return; // unchanged; don't bother KWin
+    }
     KWindowEffects::enableBlurBehind(handle, !blur.isEmpty(), blur);
+    m_appliedBlur = blur;
+    m_blurApplied = true;
 }
 
 void FinderChrome::updateShadow()
@@ -939,8 +953,12 @@ void FinderChrome::updateShadow()
         m_shadow->setLeftTile(tile(QRect(0, c, pad, 1)));
         m_shadow->setPadding(QMargins(pad, pad, pad, pad));
     }
-    m_shadow->setWindow(handle);
-    if (!m_shadow->isCreated()) {
-        m_shadow->create();
+    if (m_shadow->isCreated() && m_shadow->window() == handle) {
+        return; // already attached
     }
+    if (m_shadow->isCreated()) {
+        m_shadow->destroy();
+    }
+    m_shadow->setWindow(handle);
+    m_shadow->create();
 }

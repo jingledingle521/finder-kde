@@ -10,6 +10,7 @@
 #include <QIcon>
 #include <QObject>
 #include <QPointer>
+#include <QRegion>
 
 class KWindowShadow;
 class QMainWindow;
@@ -71,6 +72,9 @@ private:
     QPointer<QWidget> m_navigator; // the hidden breadcrumb
     QPointer<QAction> m_navigatorAction;
     KWindowShadow *m_shadow = nullptr;
+    QRegion m_appliedBlur; // last blur region sent to KWin
+    bool m_blurApplied = false;
+    bool m_surfaceReady = false; // effects sent for the current native surface
     Qt::Edges m_cursorEdges;
 };
 
