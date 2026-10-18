@@ -42,7 +42,9 @@ const QColor HairlineDark(0, 0, 0, 90);
 const QColor HairlineLight(255, 255, 255, 18);
 const QColor CapsuleFill(255, 255, 255, 20); // glass capsules behind toolbar buttons
 const QColor CapsuleRim(255, 255, 255, 26);
-constexpr int CapsuleHeight = 32;
+constexpr int CapsuleHeight = 34;
+constexpr int CapsulePad = 4; // between a capsule's rim and the buttons inside
+constexpr int CapsuleGap = 10; // between neighboring capsules
 
 // Box-blurs the alpha channel of a premultiplied ARGB image (three passes of
 // a box blur approximate a Gaussian).
@@ -269,8 +271,8 @@ void FinderChrome::setToolBar(QToolBar *toolBar)
     // Let the window's own background (and rounded corners) show through.
     toolBar->setAutoFillBackground(false);
     toolBar->setStyleSheet(QStringLiteral("QToolBar { background: transparent; border: none; }"
-                                         "QToolButton { background: transparent; border: none; border-radius: 14px;"
-                                         " padding: 4px 7px; margin: 0px 1px; }"
+                                         "QToolButton { background: transparent; border: none; border-radius: 13px;"
+                                         " padding: 0px; margin: 8px 0px; min-width: 38px; min-height: 26px; max-height: 26px; }"
                                          "QToolButton:hover { background: rgba(255, 255, 255, 20); }"
                                          "QToolButton:checked, QToolButton:pressed { background: rgba(255, 255, 255, 38); }"
                                          "QToolButton::menu-indicator { image: none; width: 0; }"));
@@ -299,6 +301,30 @@ void FinderChrome::setToolBar(QToolBar *toolBar)
             navigators = action;
         }
     }
+    // Breathing room between capsules and at the right edge.
+    auto gap = [toolBar](int width) {
+        auto *w = new QWidget(toolBar);
+        w->setFixedWidth(width);
+        w->setAttribute(Qt::WA_TransparentForMouseEvents);
+        return w;
+    };
+    for (QAction *action : actions) {
+        const QString name = action->objectName();
+        if (name == QLatin1String("icons") || name == QLatin1String("toggle_search")) {
+            toolBar->insertWidget(action, gap(CapsuleGap + 2 * CapsulePad));
+        }
+        if (name == QLatin1String("go_back")) {
+            toolBar->insertWidget(action, gap(CapsulePad));
+        }
+        if (name == QLatin1String("toggle_search")) {
+            // Search is a round button on its own.
+            if (QWidget *button = toolBar->widgetForAction(action)) {
+                button->setFixedWidth(CapsuleHeight - 2 * CapsulePad);
+            }
+        }
+    }
+    toolBar->addWidget(gap(CapsulePad + 8));
+
     if (!navigators) {
         return;
     }
@@ -403,7 +429,7 @@ void FinderChrome::paintCapsules(QPainter &p)
         QRectF capsule(box);
         capsule.setTop(box.center().y() - CapsuleHeight / 2.0 + 0.5);
         capsule.setHeight(CapsuleHeight);
-        capsule.adjust(-2, 0, 2, 0);
+        capsule.adjust(-CapsulePad, 0, CapsulePad, 0);
         if (capsule.width() < capsule.height()) { // a lone round button
             capsule.adjust(-(capsule.height() - capsule.width()) / 2, 0, (capsule.height() - capsule.width()) / 2, 0);
         }
