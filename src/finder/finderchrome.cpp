@@ -742,6 +742,14 @@ void FinderChrome::updateTitle()
     if (dash > 0) {
         text = text.left(dash);
     }
+    // Use the sidebar's names for places Dolphin titles differently.
+    if (auto *window = qobject_cast<DolphinMainWindow *>(m_window)) {
+        if (DolphinViewContainer *container = window->activeViewContainer()) {
+            if (container->url().scheme() == QLatin1String("recentlyused")) {
+                text = i18nc("@title Finder window", "Recents");
+            }
+        }
+    }
     m_title->setText(text);
     updateTitleColor();
 }

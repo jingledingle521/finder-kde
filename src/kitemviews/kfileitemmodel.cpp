@@ -925,7 +925,8 @@ bool KFileItemModel::isExpandable(int index) const
     if (index >= 0 && index < count()) {
         // Call data (instead of accessing m_itemData directly)
         // to ensure that the value is initialized.
-        return data(index).value("isExpandable").toBool();
+        const QHash<QByteArray, QVariant> values = data(index);
+        return values.value("isExpandable").toBool() && values.value("isDir").toBool(); // Finder: folders only
     }
     return false;
 }
@@ -2189,7 +2190,12 @@ QHash<QByteArray, QVariant> KFileItemModel::retrieveData(const KFileItem &item, 
     QHash<QByteArray, QVariant> data;
     data.insert(sharedValue("url"), item.url());
 
-    const bool isDir = item.isDir();
+    // Finder: a disk image or archive that KIO lists as a folder (in Recents,
+    // say) still shows as a file: its size, no disclosure chevron. Opening it
+    // goes by the KFileItem, so it still opens the same way.
+    const QString mime = item.mimetype();
+    const bool isDir = item.isDir() && (mime.isEmpty() || mime == QLatin1String("inode/directory") || !item.currentMimeType().isValid()
+                                        || item.currentMimeType().inherits(QStringLiteral("inode/directory")));
     if (m_requestRole[IsDirRole] && isDir) {
         data.insert(sharedValue("isDir"), true);
     }
@@ -3121,7 +3127,7 @@ const KFileItemModel::RoleInfoMap *KFileItemModel::rolesInfoMap(int &count)
         { "size",                SizeRole,                kli18nc("@label", "Size"),                 KLazyLocalizedString(),        KLazyLocalizedString(),                    false,           false },
         { "modificationtime",    ModificationTimeRole,    kli18nc("@label", "Date Modified"),            KLazyLocalizedString(),        kli18nc("@tooltip", "The date format can be selected in settings."),                    false,           false },
         { "creationtime",        CreationTimeRole,        kli18nc("@label", "Created"),              KLazyLocalizedString(),        kli18nc("@tooltip", "The date format can be selected in settings."),                    false,           false },
-        { "accesstime",          AccessTimeRole,          kli18nc("@label", "Accessed"),             KLazyLocalizedString(),        kli18nc("@tooltip", "The date format can be selected in settings."),                    false,           false },
+        { "accesstime",          AccessTimeRole,          kli18nc("@label", "Date Last Opened"),             KLazyLocalizedString(),        kli18nc("@tooltip", "The date format can be selected in settings."),                    false,           false },
         { "type",                TypeRole,                kli18nc("@label", "Kind"),                 KLazyLocalizedString(),        KLazyLocalizedString(),                    false,           false },
         { "rating",              RatingRole,              kli18nc("@label", "Rating"),               KLazyLocalizedString(),        KLazyLocalizedString(),                    true,            false },
         { "tags",                TagsRole,                kli18nc("@label", "Tags"),                 KLazyLocalizedString(),        KLazyLocalizedString(),                    true,            false },

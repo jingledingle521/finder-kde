@@ -266,7 +266,8 @@ ViewProperties::ViewProperties(const QUrl &url)
             if (useRecentDocumentsView) {
                 setSortRole(QByteArrayLiteral("accesstime"));
                 setViewMode(DolphinView::DetailsView);
-                setVisibleRoles({"text", "path", "accesstime"});
+                // Finder: the same columns as any folder, with Date Last Opened.
+                setVisibleRoles({"text", "accesstime", "size", "type"});
             } else {
                 setSortRole(QByteArrayLiteral("modificationtime"));
             }

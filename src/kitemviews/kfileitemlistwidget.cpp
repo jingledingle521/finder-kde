@@ -94,7 +94,9 @@ QString KFileItemListWidgetInformant::roleText(const QByteArray &role, const QHa
     };
 
     if (role == "size" && forUsageAs == KStandardItemListWidgetInformant::ForUsageAs::DisplayedText) {
-        text = values.value("isDir").toBool() ? QStringLiteral("--") : finderSize(roleValue.value<KIO::filesize_t>());
+        // Unknown sizes come through as -1 (or nothing): show "--", not 18 exabytes.
+        const bool unknown = roleValue.isNull() || roleValue.toLongLong() < 0;
+        text = values.value("isDir").toBool() || unknown ? QStringLiteral("--") : finderSize(roleValue.value<KIO::filesize_t>());
     } else if (role == "size") {
         if (values.value("isDir").toBool()) {
             if (!roleValue.isNull() && roleValue != -1) {

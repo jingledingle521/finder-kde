@@ -2417,7 +2417,8 @@ void KItemListView::updateAlternateBackgroundForWidget(KItemListWidget *widget)
 
 bool KItemListView::useAlternateBackgrounds() const
 {
-    return m_alternateBackgrounds && m_itemSize.isEmpty();
+    // Finder: no zebra stripes while the list is grouped.
+    return m_alternateBackgrounds && m_itemSize.isEmpty() && !m_grouped;
 }
 
 QHash<QByteArray, qreal> KItemListView::preferredColumnWidths(const KItemRangeList &itemRanges) const

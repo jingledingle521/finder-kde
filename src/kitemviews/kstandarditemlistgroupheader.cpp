@@ -32,8 +32,13 @@ void KStandardItemListGroupHeader::paint(QPainter *painter, const QStyleOptionGr
 void KStandardItemListGroupHeader::paintRole(QPainter *painter, const QRectF &roleBounds, const QColor &color)
 {
     if (m_pixmap.isNull()) {
-        painter->setPen(color);
-        painter->drawText(roleBounds, 0, m_text);
+        // Finder: group titles ("Today", "Yesterday") in semibold.
+        Q_UNUSED(color)
+        QFont bold = font();
+        bold.setWeight(QFont::DemiBold);
+        painter->setFont(bold);
+        painter->setPen(QColor(255, 255, 255, 220));
+        painter->drawText(roleBounds, Qt::AlignVCenter | Qt::AlignLeft, m_text);
     } else {
         painter->drawPixmap(roleBounds.topLeft(), m_pixmap);
     }
@@ -41,6 +46,12 @@ void KStandardItemListGroupHeader::paintRole(QPainter *painter, const QRectF &ro
 
 void KStandardItemListGroupHeader::paintSeparator(QPainter *painter, const QColor &color)
 {
+    // Finder: a faint hairline under every group title, inset like the rows.
+    if (scrollOrientation() == Qt::Vertical) {
+        Q_UNUSED(color)
+        painter->fillRect(QRectF(8, size().height() - 1, size().width() - 16, 1), QColor(255, 255, 255, 26));
+        return;
+    }
     if (itemIndex() == 0) {
         // No top- or left-line should be drawn for the first group-header
         return;

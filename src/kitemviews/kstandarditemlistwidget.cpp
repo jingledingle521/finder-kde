@@ -1072,7 +1072,9 @@ void KStandardItemListWidget::triggerCacheRefreshing()
     refreshCache();
 
     const QHash<QByteArray, QVariant> values = data();
-    m_isExpandable = m_supportsItemExpanding && values["isExpandable"].toBool();
+    // Finder: only folders get a disclosure chevron (not disk images and
+    // archives that KIO could open like folders).
+    m_isExpandable = m_supportsItemExpanding && values["isExpandable"].toBool() && values["isDir"].toBool();
     m_isHidden = isHidden();
     m_customizedFont = customizedFont(styleOption().font);
     m_customizedFontMetrics = QFontMetrics(m_customizedFont);
