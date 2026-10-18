@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <!DOCTYPE gui SYSTEM "kpartgui.dtd">
-<gui name="dolphin" version="51">
+<gui name="dolphin" version="52">
     <MenuBar>
         <Menu name="file">
             <Action name="new_menu" />
@@ -112,7 +112,6 @@
         <Action name="go_forward" />
         <Action name="url_navigators" />
         <Action name="icons" />
-        <Action name="compact" />
         <Action name="details" />
         <Action name="group_by" />
         <Action name="toggle_search" />

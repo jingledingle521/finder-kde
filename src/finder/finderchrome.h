@@ -12,6 +12,7 @@
 #include <QPointer>
 #include <QRegion>
 
+class FinderColumnView;
 class KWindowShadow;
 class QMainWindow;
 class QAction;
@@ -52,6 +53,11 @@ private:
     void updateTitle();
     QToolButton *createMoreButton(QToolBar *toolBar);
     static QIcon groupIcon();
+    static QIcon columnsIcon();
+    /** Finder's column view on or off (laid over the active Dolphin view). */
+    void setColumnMode(bool on);
+    void attachColumns();
+    void leaveColumnMode();
     void updateTitleColor();
     void updateLead();
     void paintCapsules(QPainter &p);
@@ -71,6 +77,9 @@ private:
     QPointer<QWidget> m_lead; // spacer from the stoplights to the content edge
     QPointer<QWidget> m_navigator; // the hidden breadcrumb
     QPointer<QAction> m_navigatorAction;
+    QAction *m_columnsAction = nullptr;
+    QPointer<FinderColumnView> m_columns;
+    bool m_columnMode = false;
     KWindowShadow *m_shadow = nullptr;
     QRegion m_appliedBlur; // last blur region sent to KWin
     bool m_blurApplied = false;

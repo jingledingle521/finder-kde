@@ -5,6 +5,14 @@
  */
 
 #include "finderchrome.h"
+#include "findercolumnview.h"
+
+#include "dolphinmainwindow.h"
+#include "dolphinviewcontainer.h"
+#include "views/dolphinview.h"
+
+#include <KConfigGroup>
+#include <KSharedConfig>
 
 #include <KUrlComboBox>
 #include <KUrlNavigator>
@@ -279,6 +287,7 @@ void FinderChrome::setToolBar(QToolBar *toolBar)
                                          " padding: 0px; margin: 8px 0px; min-width: 38px; min-height: 26px; max-height: 26px; }"
                                          "QToolButton:hover { background: rgba(255, 255, 255, 20); }"
                                          "QToolButton:checked, QToolButton:pressed { background: rgba(255, 255, 255, 38); }"
+                                         "QToolButton[finderOff=\"true\"]:checked { background: transparent; }"
                                          "QToolButton::menu-indicator { image: none; width: 0; }"));
     if (!m_stoplights) {
         m_stoplights = new Stoplights(m_window);
@@ -374,6 +383,140 @@ void FinderChrome::setToolBar(QToolBar *toolBar)
     connect(m_window, &QWidget::windowTitleChanged, this, &FinderChrome::updateTitle, Qt::UniqueConnection);
     updateTitle();
     watchNavigators();
+
+    // Finder's column view: a fourth view button after the list view.
+    if (!m_columnsAction) {
+        m_columnsAction = new QAction(columnsIcon(), i18nc("@action:intoolbar Finder view mode", "Columns"), this);
+        m_columnsAction->setObjectName(QStringLiteral("finder_columns"));
+        m_columnsAction->setCheckable(true);
+        m_columnsAction->setToolTip(i18nc("@info:tooltip", "View as columns"));
+        connect(m_columnsAction, &QAction::triggered, this, [this]() {
+            setColumnMode(true);
+        });
+        connect(qobject_cast<DolphinMainWindow *>(m_window), &DolphinMainWindow::urlChanged, this, [this]() {
+            if (m_columnMode) {
+                QTimer::singleShot(0, this, &FinderChrome::attachColumns);
+            }
+        });
+        m_columnMode = KSharedConfig::openConfig()->group(QStringLiteral("Finder")).readEntry("ColumnView", false);
+    }
+    QAction *after = nullptr;
+    for (int i = 0; i < actions.size(); ++i) {
+        const QString name = actions.at(i)->objectName();
+        if (name == QLatin1String("icons") || name == QLatin1String("compact") || name == QLatin1String("details")) {
+            // Picking another view mode leaves the column view.
+            connect(actions.at(i), &QAction::triggered, this, &FinderChrome::leaveColumnMode, Qt::UniqueConnection);
+        }
+    }
+    // Directly after the list-view button (before the gap to the next capsule).
+    const QList<QAction *> current = toolBar->actions();
+    for (int i = 0; i < current.size(); ++i) {
+        if (current.at(i)->objectName() == QLatin1String("details") && i + 1 < current.size()) {
+            after = current.at(i + 1);
+        }
+    }
+    toolBar->insertAction(after, m_columnsAction);
+    if (auto *button = qobject_cast<QToolButton *>(toolBar->widgetForAction(m_columnsAction))) {
+        button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    }
+    QTimer::singleShot(0, this, [this]() {
+        setColumnMode(m_columnMode);
+    });
+}
+
+QIcon FinderChrome::columnsIcon()
+{
+    // Finder's column-view glyph: a rounded box split into three panes.
+    QIcon icon;
+    for (const qreal dpr : {1.0, 1.5, 2.0}) {
+        QPixmap pm(QSize(22, 22) * dpr);
+        pm.setDevicePixelRatio(dpr);
+        pm.fill(Qt::transparent);
+        QPainter p(&pm);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.scale(22.0 / 16.0, 22.0 / 16.0);
+        p.setPen(QPen(QColor(255, 255, 255, 225), 1.0));
+        p.setBrush(Qt::NoBrush);
+        p.drawRoundedRect(QRectF(1.5, 3.0, 13, 10), 2, 2);
+        p.drawLine(QPointF(5.8, 3.0), QPointF(5.8, 13.0));
+        p.drawLine(QPointF(10.2, 3.0), QPointF(10.2, 13.0));
+        p.end();
+        icon.addPixmap(pm);
+    }
+    return icon;
+}
+
+void FinderChrome::leaveColumnMode()
+{
+    setColumnMode(false);
+}
+
+void FinderChrome::setColumnMode(bool on)
+{
+    m_columnMode = on;
+    KConfigGroup group = KSharedConfig::openConfig()->group(QStringLiteral("Finder"));
+    if (group.readEntry("ColumnView", false) != on) {
+        group.writeEntry("ColumnView", on);
+        group.sync();
+    }
+    if (m_columnsAction) {
+        m_columnsAction->setChecked(on);
+    }
+    // Dolphin's own view mode stays checked underneath; hide its highlight.
+    if (m_toolBar) {
+        for (QAction *action : m_toolBar->actions()) {
+            const QString name = action->objectName();
+            if (name == QLatin1String("icons") || name == QLatin1String("compact") || name == QLatin1String("details")) {
+                if (QWidget *button = m_toolBar->widgetForAction(action)) {
+                    button->setProperty("finderOff", on);
+                    button->style()->unpolish(button);
+                    button->style()->polish(button);
+                    button->update();
+                }
+            }
+        }
+        m_toolBar->update();
+    }
+    if (on) {
+        attachColumns();
+    } else if (m_columns) {
+        m_columns->hide();
+        if (auto *window = qobject_cast<DolphinMainWindow *>(m_window)) {
+            if (DolphinViewContainer *container = window->activeViewContainer()) {
+                container->view()->setFocus();
+            }
+        }
+    }
+}
+
+void FinderChrome::attachColumns()
+{
+    auto *window = qobject_cast<DolphinMainWindow *>(m_window);
+    DolphinViewContainer *container = window ? window->activeViewContainer() : nullptr;
+    if (!container || !m_columnMode) {
+        return;
+    }
+    DolphinView *view = container->view();
+    if (!m_columns) {
+        m_columns = new FinderColumnView(view);
+        connect(m_columns, &FinderColumnView::folderActivated, this, [this](const QUrl &url) {
+            if (auto *window = qobject_cast<DolphinMainWindow *>(m_window)) {
+                if (DolphinViewContainer *container = window->activeViewContainer()) {
+                    container->setUrl(url);
+                }
+            }
+        });
+    }
+    if (m_columns->parentWidget() != view) {
+        m_columns->setParent(view);
+    }
+    view->removeEventFilter(this);
+    view->installEventFilter(this);
+    m_columns->setGeometry(view->rect());
+    m_columns->setRootUrl(container->url());
+    m_columns->show();
+    m_columns->raise();
+    m_columns->setFocus();
 }
 
 QIcon FinderChrome::groupIcon()
@@ -505,7 +648,7 @@ void FinderChrome::paintCapsules(QPainter &p)
     // the view modes, and search.
     static const QList<QStringList> groups = {
         {QStringLiteral("go_back"), QStringLiteral("go_forward")},
-        {QStringLiteral("icons"), QStringLiteral("compact"), QStringLiteral("details")},
+        {QStringLiteral("icons"), QStringLiteral("compact"), QStringLiteral("details"), QStringLiteral("finder_columns")},
         {QStringLiteral("group_by")},
         {QStringLiteral("finder_more")},
         {QStringLiteral("toggle_search")},
@@ -714,6 +857,11 @@ bool FinderChrome::eventFilter(QObject *watched, QEvent *event)
                 m_toolBar->update();
             }
         }
+        return false;
+    }
+
+    if (m_columns && watched == m_columns->parentWidget() && event->type() == QEvent::Resize) {
+        m_columns->setGeometry(m_columns->parentWidget()->rect());
         return false;
     }
 
