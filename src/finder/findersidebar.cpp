@@ -222,15 +222,25 @@ void FinderSidebar::rebuild()
     if (!locations.isEmpty()) {
         header(i18nc("@title Finder sidebar section", "Locations"));
         // AirDrop leads Locations, as in Finder; it opens the AirDrop panel.
-        auto *airDrop = new QStandardItem(i18nc("@item:inlistbox Finder sidebar", "AirDrop"));
-        airDrop->setData(QStringLiteral("finder-airdrop"), Qt::DecorationRole);
-        airDrop->setData(AirDropUrl(), UrlRole);
-        m_model->appendRow(airDrop);
+        if (m_airDropShown) {
+            auto *airDrop = new QStandardItem(i18nc("@item:inlistbox Finder sidebar", "AirDrop"));
+            airDrop->setData(QStringLiteral("finder-airdrop"), Qt::DecorationRole);
+            airDrop->setData(AirDropUrl(), UrlRole);
+            m_model->appendRow(airDrop);
+        }
         for (auto *item : std::as_const(locations)) {
             m_model->appendRow(item);
         }
     }
     setUrl(m_url);
+}
+
+void FinderSidebar::setAirDropShown(bool shown)
+{
+    if (m_airDropShown != shown) {
+        m_airDropShown = shown;
+        rebuild();
+    }
 }
 
 QUrl FinderSidebar::AirDropUrl()

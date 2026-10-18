@@ -564,6 +564,19 @@ generate_and_install_dbus_interface(
 
 install(TARGETS dolphin ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
 
+# Finder's Open/Save windows for xdg-desktop-portal (see finder-extras/install.sh).
+add_executable(finder-filechooser
+    finder/filechooser/main.cpp
+    finder/filechooser/filechooserportal.cpp
+    finder/filechooser/finderfiledialog.cpp
+)
+target_link_libraries(finder-filechooser
+    PRIVATE
+    dolphinprivate
+    dolphinstatic
+)
+install(TARGETS finder-filechooser ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
+
 ##########################################
 
 if(NOT WIN32)

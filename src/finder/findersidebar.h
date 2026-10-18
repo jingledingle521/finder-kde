@@ -35,6 +35,9 @@ public:
     /** The sidebar's AirDrop item; setUrl(AirDropUrl()) highlights it. */
     static QUrl AirDropUrl();
 
+    /** Whether to list AirDrop (not in the file chooser). */
+    void setAirDropShown(bool shown);
+
     enum Roles {
         UrlRole = Qt::UserRole + 1,
         HeaderRole,
@@ -63,6 +66,7 @@ private:
     QUrl m_url;
     QPersistentModelIndex m_pendingSetup; // device being mounted before opening
     bool m_pendingSetupNewTab = false;
+    bool m_airDropShown = true;
 };
 
 #endif

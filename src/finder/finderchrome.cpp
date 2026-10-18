@@ -391,6 +391,13 @@ void FinderChrome::setToolBar(QToolBar *toolBar)
     updateTitle();
     watchNavigators();
 
+    // The rest (column view, AirDrop, transfer cards, tabs) belongs to the
+    // Finder window itself, not to other windows using this chrome (the file
+    // chooser).
+    if (!qobject_cast<DolphinMainWindow *>(m_window)) {
+        return;
+    }
+
     // Finder's column view: a fourth view button after the list view.
     if (!m_columnsAction) {
         m_columnsAction = new QAction(columnsIcon(), i18nc("@action:intoolbar Finder view mode", "Columns"), this);
@@ -523,6 +530,9 @@ void FinderChrome::hideAirDrop()
 
 void FinderChrome::placeTransfers()
 {
+    if (!qobject_cast<DolphinMainWindow *>(m_window)) {
+        return; // only Finder's own window shows AirDrop transfers
+    }
     if (!m_transfers) {
         // Creating it also starts FinderAirDrop watching for incoming transfers.
         m_transfers = new FinderTransfersView(m_window);

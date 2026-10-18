@@ -32,5 +32,26 @@ ninja -C "$root/build" install
 mkdir -p "$apps"
 sed "s|@PREFIX@|$prefix|" "$root/finder-extras/org.brhett.finder.desktop" > "$apps/org.brhett.finder.desktop"
 update-desktop-database "$apps" 2>/dev/null || true
+
+# Finder's Open/Save windows for other apps, through xdg-desktop-portal.
+config=${XDG_CONFIG_HOME:-$HOME/.config}
+services=${XDG_DATA_HOME:-$HOME/.local/share}/dbus-1/services
+mkdir -p "$services" "$config/xdg-desktop-portal"
+sed "s|@PREFIX@|$prefix|" "$root/finder-extras/org.freedesktop.impl.portal.desktop.finder.service" \
+    > "$services/org.freedesktop.impl.portal.desktop.finder.service"
+if [ -f "$config/xdg-desktop-portal/kde-portals.conf" ]; then
+    grep -q 'FileChooser=finder' "$config/xdg-desktop-portal/kde-portals.conf" \
+        || echo "Add org.freedesktop.impl.portal.FileChooser=finder;kde under [preferred] in $config/xdg-desktop-portal/kde-portals.conf"
+else
+    cp "$root/finder-extras/kde-portals.conf" "$config/xdg-desktop-portal/kde-portals.conf"
+fi
+# xdg-desktop-portal only reads backend descriptions from its system folder.
+portal=/usr/share/xdg-desktop-portal/portals/finder.portal
+if ! cmp -s "$root/finder-extras/finder.portal" "$portal"; then
+    pkexec install -m 644 "$root/finder-extras/finder.portal" "$portal" \
+        || echo "Skipped the Finder file chooser: $portal needs installing as root."
+fi
+systemctl --user restart xdg-desktop-portal.service 2>/dev/null || true
+
 echo "Finder installed. Launch it from the app menu, or: $prefix/bin/finder"
 echo "For AirDrop, run finder-extras/install-airdrop."
