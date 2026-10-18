@@ -36,9 +36,9 @@ constexpr int WindowRadius = 12; // macOS window corner radius
 constexpr int ResizeBorder = 6; // grab zone along the edges, inside the window
 constexpr int ShadowSize = 32; // how far the shadow reaches outside the window
 
-const QColor ContentColor(30, 30, 32);
+const QColor ContentColor(32, 32, 37); // Golden Gate dark content, slightly cool
 const QColor SidebarColor(44, 44, 48, 200); // translucent: KWin blurs behind it
-const QColor HairlineDark(0, 0, 0, 140);
+const QColor HairlineDark(0, 0, 0, 90);
 const QColor HairlineLight(255, 255, 255, 18);
 const QColor CapsuleFill(255, 255, 255, 20); // glass capsules behind toolbar buttons
 const QColor CapsuleRim(255, 255, 255, 26);

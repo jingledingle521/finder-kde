@@ -81,6 +81,12 @@ DolphinStatusBar::DolphinStatusBar(QWidget *parent)
     // Initialize space information
     m_spaceInfo = new StatusBarSpaceInfo(contentsContainer);
     connect(m_spaceInfo, &StatusBarSpaceInfo::showMessage, this, &DolphinStatusBar::showMessage);
+    // Finder shows free space as text after the item count.
+    m_spaceInfo->setHeadless(true);
+    connect(m_spaceInfo, &StatusBarSpaceInfo::availableChanged, this, [this](const QString &available) {
+        m_available = available;
+        m_updateLabelTextTimer->start();
+    });
     connect(m_spaceInfo,
             &StatusBarSpaceInfo::showInstallationProgress,
             this,
@@ -130,7 +136,10 @@ DolphinStatusBar::DolphinStatusBar(QWidget *parent)
     m_label->setFixedHeight(contentHeight);
     m_label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
-    m_zoomSlider->setMaximumWidth(fontMetrics.averageCharWidth() * 15);
+    m_zoomSlider->setFixedWidth(fontMetrics.averageCharWidth() * 15);
+    m_label->setAlignment(Qt::AlignCenter);
+    m_balance = new QWidget(contentsContainer);
+    m_balance->setFixedWidth(fontMetrics.averageCharWidth() * 15);
 
     m_spaceInfo->setFixedHeight(contentHeight);
     m_spaceInfo->setMaximumWidth(fontMetrics.averageCharWidth() * 25);
@@ -142,6 +151,7 @@ DolphinStatusBar::DolphinStatusBar(QWidget *parent)
     m_topLayout = new QHBoxLayout(contentsContainer);
     updateContentsMargins();
     m_topLayout->setSpacing(4);
+    m_topLayout->addWidget(m_balance);
     m_topLayout->addWidget(m_label, 1);
     m_topLayout->addWidget(m_zoomLabel);
     m_topLayout->addWidget(m_zoomSlider, 1);
@@ -317,6 +327,7 @@ void DolphinStatusBar::updateMode()
         m_spaceInfo->setShown(false);
         m_zoomSlider->setVisible(false);
         m_zoomLabel->setVisible(false);
+        m_balance->setVisible(false);
         setVisible(true, WithAnimation);
         break;
     case GeneralSettings::EnumShowStatusBar::FullWidth:
@@ -353,7 +364,8 @@ void DolphinStatusBar::contextMenuEvent(QContextMenuEvent *event)
         const bool visible = showZoomSliderAction->isChecked();
         GeneralSettings::setShowZoomSlider(visible);
         m_zoomSlider->setVisible(visible);
-        m_zoomLabel->setVisible(visible);
+        m_zoomLabel->setVisible(false);
+        m_balance->setVisible(visible);
     }
     updateContentsMargins();
 }
@@ -404,7 +416,11 @@ void DolphinStatusBar::updateLabelText()
     } else {
         m_label->setTextFormat(Qt::PlainText);
         m_label->setTextElideMode(Qt::ElideMiddle);
-        m_label->setText(m_hoveredItemText.isEmpty() ? m_defaultText : m_hoveredItemText);
+        QString text = m_hoveredItemText.isEmpty() ? m_defaultText : m_hoveredItemText;
+        if (m_hoveredItemText.isEmpty() && !m_available.isEmpty() && GeneralSettings::showStatusBar() == GeneralSettings::EnumShowStatusBar::FullWidth) {
+            text = i18nc("@info:status Finder: items, free space", "%1, %2 available", text, m_available);
+        }
+        m_label->setText(text);
     }
     updateWidthToContent();
 }
@@ -423,7 +439,8 @@ void DolphinStatusBar::setExtensionsVisible(bool visible)
     }
 
     m_zoomSlider->setVisible(showZoomSlider);
-    m_zoomLabel->setVisible(showZoomSlider);
+    m_zoomLabel->setVisible(false); // Finder: just the slider
+    m_balance->setVisible(showZoomSlider);
     updateContentsMargins();
 }
 
@@ -431,7 +448,7 @@ void DolphinStatusBar::updateContentsMargins()
 {
     if (GeneralSettings::showStatusBar() == GeneralSettings::EnumShowStatusBar::FullWidth) {
         // We reduce the outside margin for the flat button so it visually has the same margin as the status bar text label on the other end of the bar.
-        m_topLayout->setContentsMargins(6, 0, 2, 0);
+        m_topLayout->setContentsMargins(10, 0, 14, 0);
     } else {
         // Add extra margins to toplayout to avoid clipping too early.
         m_topLayout->setContentsMargins(clippingAmount() * 2, 0, clippingAmount(), 0);

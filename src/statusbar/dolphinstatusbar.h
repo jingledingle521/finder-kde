@@ -184,6 +184,8 @@ private:
     /** @see setDefaultText() */
     QString m_defaultText;
     KSqueezedTextLabel *m_label;
+    QWidget *m_balance = nullptr; // Finder: mirrors the zoom slider so the text stays centered
+    QString m_available; // free space, e.g. "412.3 GiB"
     QLabel *m_zoomLabel;
     StatusBarSpaceInfo *m_spaceInfo;
 

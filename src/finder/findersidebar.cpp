@@ -20,10 +20,10 @@
 
 namespace
 {
-constexpr int RowHeight = 26;
-constexpr int HeaderHeight = 30;
+constexpr int RowHeight = 30;
+constexpr int HeaderHeight = 34;
 constexpr int SideMargin = 10; // selection inset from the sidebar edges
-constexpr int IconSize = 16;
+constexpr int IconSize = 18;
 
 const QColor Accent(0x0a, 0x84, 0xff); // macOS dark-mode system blue
 const QColor HeaderColor(255, 255, 255, 110);
@@ -109,10 +109,14 @@ public:
         p->drawPixmap(QPoint(iconX, r.top() + (r.height() - IconSize) / 2), pm);
 
         p->setPen(TextColor);
-        p->setFont(option.font);
+        QFont font = option.font;
+        if (option.state & QStyle::State_Selected) {
+            font.setWeight(QFont::DemiBold); // Finder bolds the current place
+        }
+        p->setFont(font);
         const QRect textRect(iconX + IconSize + 8, r.top(), int(pill.right()) - (iconX + IconSize + 8) - 6, r.height());
         p->drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft,
-                    option.fontMetrics.elidedText(index.data(Qt::DisplayRole).toString(), Qt::ElideRight, textRect.width()));
+                    QFontMetrics(font).elidedText(index.data(Qt::DisplayRole).toString(), Qt::ElideRight, textRect.width()));
         p->restore();
     }
 };

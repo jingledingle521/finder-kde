@@ -43,6 +43,14 @@ StatusBarSpaceInfo::StatusBarSpaceInfo(QWidget *parent)
 
 StatusBarSpaceInfo::~StatusBarSpaceInfo() = default;
 
+void StatusBarSpaceInfo::setHeadless(bool headless)
+{
+    m_headless = headless;
+    if (headless) {
+        hide();
+    }
+}
+
 void StatusBarSpaceInfo::setShown(bool shown)
 {
     m_shown = shown;
@@ -123,6 +131,10 @@ void StatusBarSpaceInfo::slotValuesChanged()
     m_hasSpaceInfo = true;
 
     const quint64 available = m_observer->available();
+    Q_EMIT availableChanged(KIO::convertSize(available));
+    if (m_headless) {
+        return;
+    }
     const quint64 used = size - available;
     const int percentUsed = qRound(100.0 * qreal(used) / qreal(size));
 

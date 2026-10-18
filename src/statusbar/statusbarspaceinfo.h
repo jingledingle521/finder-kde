@@ -45,7 +45,13 @@ public:
 
     void update();
 
+    /** Finder: report free space through availableChanged() and never show the bar itself. */
+    void setHeadless(bool headless);
+
 Q_SIGNALS:
+    /** The free space as text, e.g. "412.3 GiB". */
+    void availableChanged(const QString &available);
+
     /**
      * Requests for @p message with the given @p messageType to be shown to the user in a non-modal way.
      */
@@ -81,6 +87,7 @@ private:
     bool m_hasSpaceInfo;
     /** Whether this widget is supposed to be visible long-term. @see StatusBarSpaceInfo::setShown(). */
     bool m_shown;
+    bool m_headless = false;
 };
 
 #endif

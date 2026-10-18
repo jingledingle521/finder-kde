@@ -767,6 +767,15 @@ void DolphinView::emitStatusBarText(const int folderCount, const int fileCount, 
     QString filesText;
     QString summary;
 
+    // Finder: "63 items" / "3 of 63 selected".
+    if (selection == HasSelection) {
+        Q_EMIT statusBarTextChanged(i18nc("@info:status Finder", "%1 of %2 selected", folderCount + fileCount, m_model->count()));
+    } else {
+        Q_EMIT statusBarTextChanged(i18ncp("@info:status Finder", "1 item", "%1 items", m_model->count()));
+    }
+    Q_UNUSED(totalFileSize)
+    return;
+
     if (selection == HasSelection) {
         // At least 2 items are selected because the case of 1 selected item is handled in
         // DolphinView::requestStatusBarText().
