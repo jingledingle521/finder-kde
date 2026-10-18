@@ -153,6 +153,7 @@ FinderSidebar::FinderSidebar(KFilePlacesModel *places, QWidget *parent)
 
 void FinderSidebar::rebuild()
 {
+    QList<QStandardItem *> top; // Recents, above the first heading
     QList<QStandardItem *> favorites;
     QList<QStandardItem *> locations;
     QStandardItem *trash = nullptr;
@@ -184,7 +185,7 @@ void FinderSidebar::rebuild()
         if (url.scheme() == QLatin1String("trash")) {
             trash = item;
         } else if (group == KFilePlacesModel::RecentlySavedType) {
-            favorites.prepend(item);
+            top.append(item);
         } else if (group == KFilePlacesModel::PlacesType) {
             favorites.append(item);
         } else {
@@ -202,6 +203,9 @@ void FinderSidebar::rebuild()
         item->setFlags(Qt::NoItemFlags);
         m_model->appendRow(item);
     };
+    for (auto *item : std::as_const(top)) {
+        m_model->appendRow(item);
+    }
     if (!favorites.isEmpty()) {
         header(i18nc("@title Finder sidebar section", "Favorites"));
         for (auto *item : std::as_const(favorites)) {

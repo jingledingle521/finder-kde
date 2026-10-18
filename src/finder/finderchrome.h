@@ -14,6 +14,7 @@ class KWindowShadow;
 class QMainWindow;
 class QAction;
 class QLabel;
+class QPainter;
 class QToolBar;
 class QWidget;
 
@@ -46,6 +47,9 @@ protected:
 private:
     void paintBackground();
     void updateTitle();
+    void updateTitleColor();
+    void updateLead();
+    void paintCapsules(QPainter &p);
     void watchNavigators();
     void updateNavigatorVisibility();
     void updateWindowEffects();
@@ -59,6 +63,7 @@ private:
     QPointer<QWidget> m_sidebar;
     QPointer<QWidget> m_stoplights;
     QPointer<QLabel> m_title;
+    QPointer<QWidget> m_lead; // spacer from the stoplights to the content edge
     QPointer<QWidget> m_navigator; // the hidden breadcrumb
     QPointer<QAction> m_navigatorAction;
     KWindowShadow *m_shadow = nullptr;

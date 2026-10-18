@@ -117,8 +117,16 @@ void KItemListWidget::paint(QPainter *painter, const QStyleOptionGraphicsItem *o
             }
         }
 
-        const QRectF backgroundRect(0, 0, size().width(), size().height());
-        painter->fillRect(backgroundRect, backgroundColor);
+        // Finder: rounded stripes inset from the view edges.
+        const QRectF backgroundRect(8, 0, size().width() - 16, size().height());
+        const bool dark = m_styleOption.palette.color(QPalette::Window).lightnessF() < 0.5;
+        backgroundColor = dark ? QColor(255, 255, 255, 14) : QColor(0, 0, 0, 10);
+        painter->save();
+        painter->setRenderHint(QPainter::Antialiasing);
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(backgroundColor);
+        painter->drawRoundedRect(backgroundRect, 6, 6);
+        painter->restore();
     }
 
     const QStyle::State selectedState(m_selected ? QStyle::State_Selected : QStyle::State(0));
