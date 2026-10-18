@@ -261,7 +261,8 @@ ViewProperties::ViewProperties(const QUrl &url)
         } else if (useRecentDocumentsView || useDownloadsView) {
             setSortOrder(Qt::DescendingOrder);
             setSortFoldersFirst(false);
-            setGroupedSorting(true);
+            // Finder: a plain list like every other folder (newest first), not grouped by date.
+            setGroupedSorting(false);
 
             if (useRecentDocumentsView) {
                 setSortRole(QByteArrayLiteral("accesstime"));

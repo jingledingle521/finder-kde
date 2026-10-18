@@ -2430,12 +2430,14 @@ QHash<QByteArray, qreal> KItemListView::preferredColumnWidths(const KItemRangeLi
 
     // Calculate the minimum width for each column that is required
     // to show the headline unclipped.
-    const QFontMetricsF fontMetrics(m_headerWidget->font());
-    const int gripMargin = m_headerWidget->style()->pixelMetric(QStyle::PM_HeaderGripMargin);
-    const int headerMargin = m_headerWidget->style()->pixelMetric(QStyle::PM_HeaderMargin);
+    // Finder: titles are drawn semibold, with 10 px before, 8 px after and room
+    // for the sort chevron (see KItemListHeaderWidget::paintRole()).
+    QFont bold = m_headerWidget->font();
+    bold.setWeight(QFont::DemiBold);
+    const QFontMetricsF fontMetrics(bold);
     for (const QByteArray &visibleRole : std::as_const(m_visibleRoles)) {
         const QString headerText = m_model->roleDescription(visibleRole);
-        const qreal headerWidth = fontMetrics.horizontalAdvance(headerText) + gripMargin + headerMargin * 2;
+        const qreal headerWidth = fontMetrics.horizontalAdvance(headerText) + 10 + 8 + 18 + 12; // + slack for rounding
         widths.insert(visibleRole, headerWidth);
     }
 
