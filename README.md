@@ -28,6 +28,11 @@ Based on Dolphin 26.08.1. Every Finder change is a commit on top of the
   context menu, and a title and footer that follow the active column.
 - **Footer**: "16 items, 727 GB available" / "1 of 16 selected", with the
   zoom slider.
+- **Open/Save windows for other apps**: browsers, Flatpak and Snap apps
+  and others that ask the desktop for a file dialog get a Finder-style one
+  (sidebar, list/icon views, Save As, file types; Escape cancels). The
+  installer registers it with xdg-desktop-portal (KDE's dialog stays as the
+  fallback; KDE apps keep their own dialog).
 - **AirDrop** with iPhones and Macs: AirDrop in the sidebar (Ctrl+Shift+R),
   right-click › Share › AirDrop, progress cards for sending and receiving,
   and notifications. See below.

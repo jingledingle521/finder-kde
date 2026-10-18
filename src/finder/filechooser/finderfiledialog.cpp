@@ -13,6 +13,7 @@
 #include <KLocalizedString>
 #include <KUrlNavigator>
 
+#include <QApplication>
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QDir>
@@ -48,6 +49,9 @@ FinderFileDialog::FinderFileDialog(const Options &options)
     , m_places(new KFilePlacesModel(this))
 {
     setAttribute(Qt::WA_DeleteOnClose, false);
+    // Escape closes the picker from anywhere in it: the file view and text
+    // fields would otherwise take it (to clear the selection, say).
+    qApp->installEventFilter(this);
     resize(960, 600);
 
     // Toolbar: back/forward, the folder title (over a hidden path field), icon/list views.
@@ -370,12 +374,25 @@ void FinderFileDialog::closeEvent(QCloseEvent *event)
     cancel();
 }
 
+bool FinderFileDialog::eventFilter(QObject *watched, QEvent *event)
+{
+    if ((event->type() == QEvent::ShortcutOverride || event->type() == QEvent::KeyPress) && static_cast<QKeyEvent *>(event)->key() == Qt::Key_Escape
+        && watched->isWidgetType() && static_cast<QWidget *>(watched)->window() == this && isVisible()) {
+        // A popup of ours (the file-type menu, a completion list) closes first.
+        if (QApplication::activePopupWidget()) {
+            return false;
+        }
+        if (event->type() == QEvent::KeyPress) {
+            cancel();
+        }
+        event->accept();
+        return true;
+    }
+    return QMainWindow::eventFilter(watched, event);
+}
+
 void FinderFileDialog::keyPressEvent(QKeyEvent *event)
 {
-    if (event->key() == Qt::Key_Escape) {
-        cancel();
-        return;
-    }
     if ((event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) && m_accept->isEnabled()) {
         accept();
         return;

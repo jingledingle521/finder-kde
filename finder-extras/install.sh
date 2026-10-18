@@ -39,11 +39,17 @@ services=${XDG_DATA_HOME:-$HOME/.local/share}/dbus-1/services
 mkdir -p "$services" "$config/xdg-desktop-portal"
 sed "s|@PREFIX@|$prefix|" "$root/finder-extras/org.freedesktop.impl.portal.desktop.finder.service" \
     > "$services/org.freedesktop.impl.portal.desktop.finder.service"
-if [ -f "$config/xdg-desktop-portal/kde-portals.conf" ]; then
-    grep -q 'FileChooser=finder' "$config/xdg-desktop-portal/kde-portals.conf" \
-        || echo "Add org.freedesktop.impl.portal.FileChooser=finder;kde under [preferred] in $config/xdg-desktop-portal/kde-portals.conf"
+# Point the portal's file chooser at Finder (KDE's dialog stays as fallback),
+# keeping any other portal choices already made in the user's file.
+conf=$config/xdg-desktop-portal/kde-portals.conf
+if [ ! -f "$conf" ]; then
+    cp "$root/finder-extras/kde-portals.conf" "$conf"
+elif grep -q '^org.freedesktop.impl.portal.FileChooser=' "$conf"; then
+    sed -i 's|^org.freedesktop.impl.portal.FileChooser=.*|org.freedesktop.impl.portal.FileChooser=finder;kde|' "$conf"
+elif grep -q '^\[preferred\]' "$conf"; then
+    sed -i '/^\[preferred\]/a org.freedesktop.impl.portal.FileChooser=finder;kde' "$conf"
 else
-    cp "$root/finder-extras/kde-portals.conf" "$config/xdg-desktop-portal/kde-portals.conf"
+    printf '\n[preferred]\ndefault=kde\norg.freedesktop.impl.portal.FileChooser=finder;kde\n' >> "$conf"
 fi
 # xdg-desktop-portal only reads backend descriptions from its system folder.
 portal=/usr/share/xdg-desktop-portal/portals/finder.portal
