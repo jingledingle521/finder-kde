@@ -228,28 +228,17 @@ void FinderSidebar::rebuild()
 void FinderSidebar::setUrl(const QUrl &url)
 {
     m_url = url;
-    // Select the place whose URL is the longest prefix of the current folder.
-    QModelIndex best;
-    int bestLength = -1;
+    // Finder highlights a place only while showing that exact folder, not
+    // while inside one of its subfolders.
     for (int row = 0; row < m_model->rowCount(); ++row) {
         const QModelIndex index = m_model->index(row, 0);
         const QUrl place = index.data(UrlRole).toUrl();
-        if (!place.isValid()) {
-            continue;
-        }
-        if (place.matches(url, QUrl::StripTrailingSlash) || place.isParentOf(url)) {
-            const int length = place.toString().length();
-            if (length > bestLength) {
-                best = index;
-                bestLength = length;
-            }
+        if (place.isValid() && place.matches(url, QUrl::StripTrailingSlash)) {
+            selectionModel()->setCurrentIndex(index, QItemSelectionModel::ClearAndSelect);
+            return;
         }
     }
-    if (best.isValid()) {
-        selectionModel()->setCurrentIndex(best, QItemSelectionModel::ClearAndSelect);
-    } else {
-        selectionModel()->clearSelection();
-    }
+    selectionModel()->clear();
 }
 
 QModelIndex FinderSidebar::placeIndex(const QModelIndex &row) const
