@@ -12,6 +12,8 @@
 #include <QInputDialog>
 #include <QMenu>
 #include <QMimeData>
+#include <QMouseEvent>
+#include <QPainter>
 #include <QTimer>
 
 class PreventFocusWhileHidden : public QObject
@@ -44,6 +46,8 @@ DolphinTabBar::DolphinTabBar(QWidget *parent)
     setSelectionBehaviorOnRemove(QTabBar::SelectPreviousTab);
     setMovable(true);
     setTabsClosable(true);
+    setMouseTracking(true); // Finder: hover shows the tab's ×
+    setDrawBase(false);
 
     setFocusPolicy(Qt::NoFocus);
     installEventFilter(new PreventFocusWhileHidden(this));
@@ -59,6 +63,10 @@ DolphinTabBar::DolphinTabBar(QWidget *parent)
 
 QSize DolphinTabBar::tabSizeHint(int index) const
 {
+    // Finder: tabs share the bar's width equally, at a fixed height.
+    if (count() > 0) {
+        return QSize(qMax(60, width() / count()), 34);
+    }
     if (GeneralSettings::tabStyle() == GeneralSettings::EnumTabStyle::FixedSize) {
         QSize defaultSize = QTabBar::tabSizeHint(index);
         defaultSize.setWidth(225);
@@ -73,12 +81,10 @@ QSize DolphinTabBar::tabSizeHint(int index) const
 
 QSize DolphinTabBar::minimumSizeHint() const
 {
+    // Finder: tabs size to the bar (see tabSizeHint), so the bar must never
+    // ask for their sum, or the window keeps growing.
     QSize s = QTabBar::minimumSizeHint();
-
-    if (GeneralSettings::tabStyle() == GeneralSettings::EnumTabStyle::FullWidth) {
-        s.setWidth(0); // allow shrinking
-    }
-
+    s.setWidth(0);
     return s;
 }
 
@@ -130,9 +136,85 @@ void DolphinTabBar::dropEvent(QDropEvent *event)
     QTabBar::dropEvent(event);
 }
 
+QRect DolphinTabBar::closeRect(int index) const
+{
+    const QRect tab = tabRect(index);
+    return QRect(tab.left() + 12, tab.center().y() - 8, 16, 16);
+}
+
+void DolphinTabBar::paintEvent(QPaintEvent *)
+{
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing);
+
+    // The strip: a faint rounded track the tabs sit in.
+    const QRectF track = QRectF(rect()).adjusted(8, 3, -4, -3);
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(255, 255, 255, 12));
+    p.drawRoundedRect(track, track.height() / 2, track.height() / 2);
+
+    const int current = currentIndex();
+    for (int i = 0; i < count(); ++i) {
+        const QRectF tab = QRectF(tabRect(i)).intersected(track).adjusted(2, 2, -2, -2);
+        const bool selected = i == current;
+        const bool hovered = i == m_hoveredTab || i == m_autoActivationIndex;
+        if (selected || hovered) {
+            p.setPen(Qt::NoPen);
+            p.setBrush(selected ? QColor(255, 255, 255, 34) : QColor(255, 255, 255, 14));
+            p.drawRoundedRect(tab, tab.height() / 2, tab.height() / 2);
+        } else if (i + 1 < count() && i + 1 != current && i != current) {
+            // Thin divider between two unselected tabs.
+            p.fillRect(QRectF(tab.right() + 1.5, tab.top() + 7, 1, tab.height() - 14), QColor(255, 255, 255, 30));
+        }
+
+        // Title, centered; the × takes its place on the left while hovered.
+        p.setPen(selected ? QColor(255, 255, 255, 235) : QColor(255, 255, 255, 150));
+        p.setFont(font());
+        const QRectF textRect = tab.adjusted(30, 0, -30, 0);
+        p.drawText(textRect, Qt::AlignCenter, fontMetrics().elidedText(tabText(i).replace(QLatin1String("&&"), QLatin1String("&")), Qt::ElideMiddle, int(textRect.width())));
+
+        if (hovered && count() > 1) {
+            const QRectF x = QRectF(closeRect(i));
+            if (m_pressedClose == i) {
+                p.setPen(Qt::NoPen);
+                p.setBrush(QColor(255, 255, 255, 40));
+                p.drawEllipse(x);
+            }
+            p.setPen(QPen(QColor(255, 255, 255, 200), 1.4, Qt::SolidLine, Qt::RoundCap));
+            const QPointF c = x.center();
+            p.drawLine(c + QPointF(-3.5, -3.5), c + QPointF(3.5, 3.5));
+            p.drawLine(c + QPointF(-3.5, 3.5), c + QPointF(3.5, -3.5));
+        }
+    }
+}
+
+void DolphinTabBar::mouseMoveEvent(QMouseEvent *event)
+{
+    const int index = tabAt(event->pos());
+    if (index != m_hoveredTab) {
+        m_hoveredTab = index;
+        update();
+    }
+    QTabBar::mouseMoveEvent(event);
+}
+
+void DolphinTabBar::leaveEvent(QEvent *event)
+{
+    m_hoveredTab = -1;
+    m_pressedClose = -1;
+    update();
+    QTabBar::leaveEvent(event);
+}
+
 void DolphinTabBar::mousePressEvent(QMouseEvent *event)
 {
     const int index = tabAt(event->pos());
+
+    if (index >= 0 && event->button() == Qt::LeftButton && count() > 1 && closeRect(index).contains(event->pos())) {
+        m_pressedClose = index; // closes on release, if still over the ×
+        update();
+        return;
+    }
 
     if (index >= 0 && event->button() == Qt::MiddleButton) {
         m_tabToBeClosedOnMiddleMouseButtonRelease = index;
@@ -145,6 +227,16 @@ void DolphinTabBar::mousePressEvent(QMouseEvent *event)
 void DolphinTabBar::mouseReleaseEvent(QMouseEvent *event)
 {
     const int index = tabAt(event->pos());
+
+    if (m_pressedClose >= 0 && event->button() == Qt::LeftButton) {
+        const int pressed = m_pressedClose;
+        m_pressedClose = -1;
+        update();
+        if (index == pressed && closeRect(index).contains(event->pos())) {
+            Q_EMIT tabCloseRequested(index);
+        }
+        return;
+    }
 
     if (index >= 0 && index == m_tabToBeClosedOnMiddleMouseButtonRelease && event->button() == Qt::MiddleButton) {
         // Mouse middle click on a tab closes this tab.
@@ -233,17 +325,11 @@ void DolphinTabBar::contextMenuEvent(QContextMenuEvent *event)
 
 void DolphinTabBar::slotTabBarChanged()
 {
-    if (GeneralSettings::tabStyle() == GeneralSettings::EnumTabStyle::FixedSize) {
-        setExpanding(false);
-        setUsesScrollButtons(true);
-    } else if (GeneralSettings::tabStyle() == GeneralSettings::EnumTabStyle::FullWidth) {
-        setExpanding(true);
-        setUsesScrollButtons(false);
-    } else {
-        setExpanding(false);
-        setUsesScrollButtons(true);
-    }
-
+    // Finder: always full width, with our own × (not Qt's close buttons);
+    // the tab style and close-button settings don't apply.
+    setTabsClosable(false);
+    setExpanding(true);
+    setUsesScrollButtons(false);
     updateGeometry();
 }
 

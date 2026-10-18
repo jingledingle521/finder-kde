@@ -33,6 +33,10 @@ protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void mouseDoubleClickEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void leaveEvent(QEvent *event) override;
+    /** Finder: draws the tabs itself (equal widths, gray selected pill, × on hover). */
+    void paintEvent(QPaintEvent *event) override;
 
     /**
      * Opens a context menu for the tab on the \a event position.
@@ -50,10 +54,15 @@ private:
      */
     void updateAutoActivationTimer(const int index);
 
+    /** Finder: the close "×" on the left of tab @p index. */
+    QRect closeRect(int index) const;
+
 private:
     QTimer *m_autoActivationTimer;
     int m_autoActivationIndex;
     int m_tabToBeClosedOnMiddleMouseButtonRelease = -1;
+    int m_hoveredTab = -1;
+    int m_pressedClose = -1;
 };
 
 #endif // DOLPHIN_TAB_BAR_H

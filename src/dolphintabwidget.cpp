@@ -20,6 +20,7 @@
 #include <kio/global.h>
 
 #include <QApplication>
+#include <QToolButton>
 #include <QDropEvent>
 #include <QStackedWidget>
 
@@ -45,7 +46,20 @@ DolphinTabWidget::DolphinTabWidget(DolphinNavigatorsWidgetAction *navigatorsWidg
     setElideMode(Qt::ElideRight);
     setUsesScrollButtons(true);
     setTabBarAutoHide(!GeneralSettings::alwaysShowTabBar());
-    tabBar->setTabsClosable(GeneralSettings::showCloseButtonOnTabs());
+    tabBar->setTabsClosable(false); // Finder: the tab bar draws its own ×
+
+    // Finder: "+" at the right end of the tab strip opens a new tab.
+    auto *newTab = new QToolButton(this);
+    newTab->setText(QStringLiteral("+"));
+    newTab->setToolTip(i18nc("@info:tooltip", "New Tab"));
+    newTab->setAutoRaise(true);
+    newTab->setFixedSize(34, 34);
+    newTab->setStyleSheet(QStringLiteral("QToolButton { color: rgba(255,255,255,190); font-size: 17px; border: none; border-radius: 13px; margin: 4px; }"
+                                         "QToolButton:hover { background: rgba(255,255,255,24); }"));
+    connect(newTab, &QToolButton::clicked, this, [this]() {
+        openNewActivatedTab();
+    });
+    setCornerWidget(newTab, Qt::TopRightCorner);
 
     auto stackWidget{findChild<QStackedWidget *>()};
     // i18n: This accessible name will be announced any time the user moves keyboard focus e.g. from the toolbar or the places panel towards the main working
@@ -549,6 +563,10 @@ QString DolphinTabWidget::tabName(DolphinTabPage *tabPage) const
         }
     } else {
         name = tabPage->activeViewContainer()->caption();
+        // Finder: the sidebar's name for Recents.
+        if (tabPage->activeViewContainer()->url().scheme() == QLatin1String("recentlyused")) {
+            name = i18nc("@title:tab Finder", "Recents");
+        }
     }
     // clang-format on
 

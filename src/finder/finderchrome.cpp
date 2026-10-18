@@ -13,6 +13,7 @@
 
 #include "dolphinmainwindow.h"
 #include "dolphinviewcontainer.h"
+#include "dolphintabwidget.h"
 #include "statusbar/dolphinstatusbar.h"
 #include "views/dolphinview.h"
 
@@ -407,6 +408,20 @@ void FinderChrome::setToolBar(QToolBar *toolBar)
             KActionCollection::setDefaultShortcut(airDrop, QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_R));
             connect(airDrop, &QAction::triggered, this, [this]() {
                 showAirDrop({});
+            });
+        }
+        // Switching tabs: the sidebar, title and overlays follow the new tab.
+        if (auto *tabs = m_window->findChild<DolphinTabWidget *>()) {
+            connect(tabs, &DolphinTabWidget::activeViewChanged, this, [this](DolphinViewContainer *container) {
+                hideAirDrop();
+                if (m_finderSidebar && container) {
+                    m_finderSidebar->setUrl(container->url());
+                }
+                updateTitle();
+                placeTransfers();
+                if (m_columnMode) {
+                    QTimer::singleShot(0, this, &FinderChrome::attachColumns);
+                }
             });
         }
         connect(qobject_cast<DolphinMainWindow *>(m_window), &DolphinMainWindow::urlChanged, this, [this]() {
