@@ -104,30 +104,8 @@ void KItemListWidget::paint(QPainter *painter, const QStyleOptionGraphicsItem *o
 {
     Q_UNUSED(option)
 
-    if (m_alternateBackground) {
-        QColor backgroundColor = m_styleOption.palette.color(QPalette::AlternateBase);
-        if (!widget->hasFocus()) {
-            QColor baseColor = m_styleOption.palette.color(QPalette::Base);
-            if (baseColor.lightnessF() > 0.5) {
-                // theme seems light
-                backgroundColor = backgroundColor.lighter(101);
-            } else {
-                // theme seems dark
-                backgroundColor = backgroundColor.darker(101);
-            }
-        }
-
-        // Finder: rounded stripes inset from the view edges.
-        const QRectF backgroundRect(8, 0, size().width() - 16, size().height());
-        const bool dark = m_styleOption.palette.color(QPalette::Window).lightnessF() < 0.5;
-        backgroundColor = dark ? QColor(255, 255, 255, 14) : QColor(0, 0, 0, 10);
-        painter->save();
-        painter->setRenderHint(QPainter::Antialiasing);
-        painter->setPen(Qt::NoPen);
-        painter->setBrush(backgroundColor);
-        painter->drawRoundedRect(backgroundRect, 6, 6);
-        painter->restore();
-    }
+    // Finder: zebra stripes are drawn by the view (KItemListView::paint()),
+    // so they don't lag or linger while rows animate between view modes.
 
     if (paintFinderHighlight(painter, widget, (m_selected || m_clickHighlighted) && m_editedRole.isEmpty())) {
         return;

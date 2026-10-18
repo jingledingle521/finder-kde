@@ -517,6 +517,10 @@ void DolphinTabWidget::renameTab(int index, const QString &name)
 void DolphinTabWidget::tabInserted(int index)
 {
     QTabWidget::tabInserted(index);
+    // Finder: the + shows only with the tab strip.
+    if (QWidget *plus = cornerWidget(Qt::TopRightCorner)) {
+        plus->setVisible(count() > 1 || !tabBarAutoHide());
+    }
 
     if (tabBar()->isVisible()) {
         // Resolve all pending tab icons
@@ -539,6 +543,9 @@ void DolphinTabWidget::tabInserted(int index)
 void DolphinTabWidget::tabRemoved(int index)
 {
     QTabWidget::tabRemoved(index);
+    if (QWidget *plus = cornerWidget(Qt::TopRightCorner)) {
+        plus->setVisible(count() > 1 || !tabBarAutoHide());
+    }
 
     Q_EMIT tabCountChanged(count());
     m_lastViewedTab->setActive(true);

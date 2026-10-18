@@ -780,41 +780,53 @@ void KItemListView::paint(QPainter *painter, const QStyleOptionGraphicsItem *opt
 {
     QGraphicsWidget::paint(painter, option, widget);
 
-    if (useAlternateBackgrounds()) {
-        // Finder: the zebra stripes carry on below the last item, filling the view.
-        KItemListWidget *last = nullptr;
-        for (auto it = m_visibleItems.constBegin(); it != m_visibleItems.constEnd(); ++it) {
-            if (!last || it.key() > last->index()) {
-                last = it.value();
-            }
+    if (useAlternateBackgrounds() && m_model) {
+        // Finder: the view draws all the zebra stripes, from where the rows
+        // end up (the layouter), not where the row widgets currently are: rows
+        // animate into place when switching view modes, and stripes must
+        // neither lag behind nor linger. Below the last row they carry on to
+        // fill the view.
+        const int count = m_model->count();
+        qreal rowHeight = 0;
+        if (count > 0) {
+            rowHeight = m_layouter->itemRect(0).height();
         }
-        qreal rowHeight;
-        qreal y;
-        int index;
-        if (last) {
-            rowHeight = last->size().height();
-            y = last->pos().y() + rowHeight;
-            index = last->index() + 1;
-            if (m_headerWidget->isVisible()) {
-                m_headerWidget->setNameTextX(last->pos().x() + last->textFocusRect().left() + m_styleOption.padding);
-            }
-        } else {
+        if (rowHeight <= 0) {
             rowHeight = m_styleOption.padding * 2 + qMax(qreal(m_styleOption.iconSize), qreal(m_styleOption.fontMetrics.height()));
-            y = m_headerWidget->isVisible() ? m_headerWidget->size().height() : 0;
-            index = 0;
         }
-        if (m_model && (!last || last->index() >= m_model->count() - 1) && rowHeight > 0) {
-            const bool dark = palette().color(QPalette::Window).lightnessF() < 0.5;
-            painter->save();
-            painter->setRenderHint(QPainter::Antialiasing);
-            painter->setPen(Qt::NoPen);
-            painter->setBrush(dark ? QColor(255, 255, 255, 14) : QColor(0, 0, 0, 10));
-            for (; y < size().height(); y += rowHeight, ++index) {
+        const qreal headerHeight = m_headerWidget->isVisible() ? m_headerWidget->size().height() : 0;
+        const bool dark = palette().color(QPalette::Window).lightnessF() < 0.5;
+        painter->save();
+        painter->setRenderHint(QPainter::Antialiasing);
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(dark ? QColor(255, 255, 255, 14) : QColor(0, 0, 0, 10));
+        painter->setClipRect(QRectF(0, headerHeight, size().width(), size().height() - headerHeight));
+
+        int index = qMax(0, m_layouter->firstVisibleIndex());
+        qreal y = headerHeight;
+        if (count > 0) {
+            const int last = qMin(count - 1, qMax(index, m_layouter->lastVisibleIndex()));
+            for (; index <= last; ++index) {
+                const QRectF row = m_layouter->itemRect(index);
                 if (index & 1) {
-                    painter->drawRoundedRect(QRectF(8, y, size().width() - 16, rowHeight), 6, 6);
+                    painter->drawRoundedRect(QRectF(8, row.top(), size().width() - 16, row.height()), 6, 6);
                 }
+                y = row.bottom();
             }
-            painter->restore();
+        }
+        for (; y < size().height() && rowHeight > 0; y += rowHeight, ++index) {
+            if (index & 1) {
+                painter->drawRoundedRect(QRectF(8, y, size().width() - 16, rowHeight), 6, 6);
+            }
+        }
+        painter->restore();
+
+        // The first column title lines up with the file names.
+        if (m_headerWidget->isVisible()) {
+            for (KItemListWidget *widget : std::as_const(m_visibleItems)) {
+                m_headerWidget->setNameTextX(widget->pos().x() + widget->textFocusRect().left() + m_styleOption.padding);
+                break;
+            }
         }
     }
 
@@ -1910,6 +1922,8 @@ KItemListRubberBand *KItemListView::rubberBand() const
 
 void KItemListView::doLayout(LayoutAnimationHint hint, int changedIndex, int changedCount)
 {
+    update(); // Finder: the zebra stripes follow the layout (see paint())
+
     if (m_activeTransactions > 0) {
         if (hint == NoAnimation) {
             // As soon as at least one property change should be done without animation,
