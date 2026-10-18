@@ -1,51 +1,65 @@
-# Dolphin
+# finder-kde
 
-Dolphin is KDE's file manager that lets you navigate and browse the contents of your hard drives, USB sticks, SD cards, and more. Creating, moving, or deleting files and folders is simple and fast. See more information [on Dolphin's homepage](https://apps.kde.org/dolphin/).
+**Finder for KDE Plasma**: KDE's [Dolphin](https://apps.kde.org/dolphin/)
+file manager rebuilt to look and work like the macOS (Golden Gate) Finder.
+It installs as a separate app called Finder, next to stock Dolphin, with its
+own settings.
 
-![Screenshot](https://cdn.kde.org/screenshots/dolphin/dolphin.png)
+Based on Dolphin 26.08.1. Every Finder change is a commit on top of the
+`v26.08.1` tag, and the upstream code is marked `Finder:` where it was changed.
 
-## User Documentation
+## What's different from Dolphin
 
-See https://userbase.kde.org/Special:myLanguage/Dolphin.
+- **Window**: frameless, rounded, with its own stoplights (close, minimize,
+  zoom), a native shadow, and a translucent glass sidebar that runs to the
+  top of the window. Drag empty toolbar space to move; double-click to zoom.
+- **Toolbar**: glass capsules for back/forward, the view modes (icons, list,
+  columns), Group By, a "…" actions menu and search. The folder name is
+  shown as a bold title; click it (or Ctrl+L) to type a path.
+- **Sidebar**: Recents, Favorites and Locations, with accent-tinted icons,
+  rounded selection, mount-on-click for drives, and AirDrop.
+- **Icon view**: Finder's selection (a gray tile behind the icon and a blue
+  pill behind the name), no hover or focus boxes.
+- **List view**: Name / Date Modified / Size / Kind columns, flat header
+  with the sort column in bold, zebra stripes that fill the view, full-row
+  blue selection, disclosure chevrons, "Today at 4:49 PM" dates and decimal
+  sizes ("245 KB", "--" for folders).
+- **Column view** (new): Miller columns with a preview column, its own
+  context menu, and a title and footer that follow the active column.
+- **Footer**: "16 items, 727 GB available" / "1 of 16 selected", with the
+  zoom slider.
+- **AirDrop** with iPhones and Macs: AirDrop in the sidebar (Ctrl+Shift+R),
+  right-click › Share › AirDrop, progress cards for sending and receiving,
+  and notifications. See below.
 
-## Contributing
+## Install
 
-Like other projects in the KDE ecosystem, contributions are welcome from all. This repository is managed in [KDE Invent](https://invent.kde.org/system/dolphin), our GitLab instance.
+```sh
+finder-extras/install.sh --deps   # first time: build dependencies (Fedora)
+finder-extras/install.sh          # build and install into ~/.local/opt/finder
+```
 
-* Want to contribute code? See the [GitLab wiki page](https://community.kde.org/Infrastructure/GitLab) for a tutorial on how to send a merge request.
-* Reporting a bug? Please submit it on the [KDE Bugtracking System](https://bugs.kde.org/enter_bug.cgi?format=guided&product=dolphin). Please do not use the Issues
-tab to report bugs.
-* Is there a part of Dolphin that's not translated? See the [Getting Involved in Translation wiki page](https://community.kde.org/Get_Involved/translation) to see how
-you can help translate!
+Finder then shows up in your app menu. To make it the default file manager:
 
-If you get stuck or need help with anything at all, head over to the [KDE New Contributors room](https://go.kde.org/matrix/#/#kde-welcome:kde.org) on Matrix. For questions about Dolphin, please ask in the [KDE File Management room](https://go.kde.org/matrix/#/#kde-fm:kde.org). See [Matrix](https://community.kde.org/Matrix) for more details.
+```sh
+xdg-mime default org.brhett.finder.desktop inode/directory
+```
 
-## Development Philosophy
+## AirDrop
 
-Dolphin is a file manager focusing on usability. When reading the term Usability people often assume that the focus is on newbies and only basic features are offered. This is not the case; Dolphin is quite full-featured, but the features are carefully chosen so as to not impede any of the users in the target user groups.
+AirDrop runs on [omdrop-owl](https://github.com/t4t5/omdrop-owl), the open
+AirDrop radio for non-Apple Wi-Fi cards, and
+[omdrop](https://github.com/netmojo-systems/omdrop-plugin). On Fedora,
+`finder-extras/install-airdrop` builds and installs both and opens the
+AirDrop port in firewalld.
 
-### Target User Groups
+It depends on your Wi-Fi card (see omdrop-owl's hardware table). On most
+Intel cards AirDrop takes the card over, so **Wi-Fi disconnects while
+AirDrop is on** and reconnects afterwards. Finder warns before turning it on.
 
-Focusing on usability means that features are discoverable and efficient to use. The feature set is defined indirectly by the target user group of Dolphin:
+## Upstream
 
-- **Lisa**: Lisa has been familiar with computers for 10 years. From her job, she has experience with Word, Excel and Outlook. At home she mainly uses the computer for browsing the web and writing e-mails. She requires a file manager for managing photos from the camera, documents she gets via e-mail, or PDFs she downloads with a browser. Lisa knows concepts like folders and a file hierarchy, but she is not familiar with the file hierarchy of Linux.
-
-- **Simon**: Simon has been a developer at a software company for 8 years. At home he uses a file manager to maintain his large collection of photos and music. Additionally he owns a small homepage and needs to transfer updated files on the FTP server. Moving and copying files are regular tasks in Simon's workflow.
-
-Not part of the target user group of Dolphin are Fred and Jeff:
-
-- **Fred**: Fred is 75 years old and is able to write e-mails and browsing the web. He is not familiar with file hierarchies and stores all his documents on the desktop.
-
-- **Jeff**: Jeff is Linux-freak since the age of 16 a few years ago. He is a developer and in his spare time he acts as administrator for a small company. Jeff has two monitors to keep the overview about his huge number of opened applications.
-
-This does not mean that Fred or Jeff cannot work with Dolphin. But there might be features and concepts of Dolphin that overburden Fred. Also Jeff might miss some features which are a must-have for his daily work. This is acceptable; there are other tools that cater specifically to their needs.
-
-### Non-Intrusive Features
-
-Before a feature is added in Dolphin, check whether the feature is mandatory for the target user group. If this is not the case, then this does not mean that the feature cannot be added; first it must be clarified whether the feature might be non-intrusive, so that it adds value for users outside the primary target user group of Dolphin. The term "non-intrusive" is mainly related to the user interface. A feature that adds a lot of clutter to the main menu, context menus or toolbar might harm the target user group. In this case the feature should not be added.
-
-A good example of a feature that is non-intrusive is the embedded terminal in Dolphin. It only requires one entry inside a sub-menu, but adds great value for Jeff, who is not part of the target user group.
-
-### Options
-
-Options are mandatory as the "average Joe" user does not exist. Still it is not the goal of Dolphin to offer options for all kind of things. Again the focus is on the possible needs of the target user group. Each additional option makes it harder finding other options, so the same rules for features are applied to options too.
+Dolphin is © the KDE community, and Finder keeps its license
+(GPL-2.0-or-later; see [COPYING](COPYING) and [LICENSES](LICENSES)). The
+original README is in [README.dolphin.md](README.dolphin.md). Finder is not
+affiliated with KDE or Apple.

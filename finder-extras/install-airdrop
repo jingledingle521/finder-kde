@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Set up AirDrop for Finder: omdrop-owl (the AirDrop radio for non-Apple
+# Wi-Fi cards, github.com/t4t5/omdrop-owl) and omdrop (the send/receive
+# tool, github.com/netmojo-systems/omdrop-plugin), plus a narrow firewall
+# opening. Finder's AirDrop sidebar item, Share › AirDrop menu and
+# progress cards all run on these.
+#
+#   install-airdrop      build and install (asks for your password through
+#                        the system prompt for the root steps)
+#
+# Fedora (dnf + firewalld) is what this was written and tested on; on other
+# distributions follow the two projects' READMEs instead.
+#
+# Heads-up: on most Intel Wi-Fi cards AirDrop takes the card over, so Wi-Fi
+# disconnects while AirDrop is on and reconnects when it turns off.
+set -euo pipefail
+
+src=${XDG_CACHE_HOME:-$HOME/.cache}/mac-glass-kde/airdrop-src
+
+command -v dnf >/dev/null || { echo "install-airdrop handles Fedora (dnf) only; see the omdrop-owl README for other systems." >&2; exit 1; }
+
+echo "Installing build tools…"
+pkexec dnf -y install rpm-build cmake gcc gcc-c++ make git libev-devel libpcap-devel libnl3-devel keyutils python3-libarchive-c
+
+mkdir -p "$src"
+for repo in t4t5/omdrop-owl netmojo-systems/omdrop-plugin; do
+    dir=$src/$(basename "$repo")
+    if [ -d "$dir/.git" ]; then
+        git -C "$dir" pull -q --ff-only
+    else
+        git clone -q --depth 1 "https://github.com/$repo.git" "$dir"
+    fi
+done
+
+echo "Building the AirDrop radio (omdrop-owl)…"
+(cd "$src/omdrop-owl" && rm -f omdrop-owl-*.rpm && tools/build-rpm.sh)
+rpm=$(ls "$src"/omdrop-owl/omdrop-owl-*.rpm | head -n1)
+# pkexec runs in root's home, so the package needs its full path.
+pkexec dnf -y install "$rpm"
+
+echo "Setting up omdrop…"
+"$src/omdrop-plugin/bin/omdrop" setup
+
+# The receiver listens on TCP 8771 (and answers discovery on UDP 5353) on
+# the AirDrop interface only; open exactly that, to link-local peers.
+if systemctl is-active -q firewalld; then
+    echo "Opening the AirDrop port in firewalld…"
+    pkexec sh -c '
+        firewall-cmd -q --permanent --get-zones | tr " " "\n" | grep -qx airdrop || firewall-cmd -q --permanent --new-zone=airdrop
+        firewall-cmd -q --permanent --zone=airdrop --add-interface=awdl0 || true
+        firewall-cmd -q --permanent --zone=airdrop --add-rich-rule="rule family=ipv6 source address=fe80::/10 port port=8771 protocol=tcp accept"
+        firewall-cmd -q --permanent --zone=airdrop --add-rich-rule="rule family=ipv6 source address=fe80::/10 port port=5353 protocol=udp accept"
+        firewall-cmd -q --reload'
+elif command -v ufw >/dev/null; then
+    "$HOME/.local/bin/omdrop" firewall install
+fi
+
+"$HOME/.local/bin/omdrop" doctor
+echo "AirDrop is set up. In Finder: AirDrop in the sidebar (Ctrl+Shift+R), or right-click a file › Share › AirDrop."
