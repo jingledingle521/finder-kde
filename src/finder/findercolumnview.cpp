@@ -20,6 +20,7 @@
 #include <KIO/OpenUrlJob>
 #include <KIO/Paste>
 #include <KIO/PasteJob>
+#include <KIO/PreviewJob>
 #include <KIO/RenameFileDialog>
 #include <KLocalizedString>
 #include <KPropertiesDialog>
@@ -30,6 +31,7 @@
 #include <QInputDialog>
 #include <QMenu>
 #include <QMimeData>
+#include <QTextLayout>
 #include <QTimer>
 #include <QLabel>
 #include <QListView>
@@ -63,7 +65,11 @@ QPixmap smallIcon(const QIcon &icon, qreal dpr)
 class ColumnDelegate : public QStyledItemDelegate
 {
 public:
-    using QStyledItemDelegate::QStyledItemDelegate;
+    explicit ColumnDelegate(QAbstractItemView *view)
+        : QStyledItemDelegate(view)
+        , m_view(view)
+    {
+    }
 
     QSize sizeHint(const QStyleOptionViewItem &, const QModelIndex &) const override
     {
@@ -75,9 +81,18 @@ public:
         p->save();
         p->setRenderHint(QPainter::Antialiasing);
         const QRectF row = QRectF(option.rect).adjusted(6, 1, -6, -1);
-        const bool selected = option.state & QStyle::State_Selected;
-        // Blue in the column that has focus; the folders leading to it stay gray.
-        const bool focused = option.widget && option.widget->hasFocus() && option.widget->isActiveWindow();
+        // The current item and the folders leading to it are highlighted:
+        // blue in the active column (the current item's), gray before it.
+        const QModelIndex current = m_view->currentIndex();
+        bool onPath = false;
+        for (QModelIndex at = current; at.isValid(); at = at.parent()) {
+            if (at == index) {
+                onPath = true;
+                break;
+            }
+        }
+        const bool selected = (option.state & QStyle::State_Selected) || onPath;
+        const bool focused = current.isValid() && index.parent() == current.parent() && m_view->isActiveWindow();
         if (selected) {
             QPainterPath path;
             path.addRoundedRect(row, 5, 5);
@@ -105,7 +120,67 @@ public:
         }
         p->restore();
     }
+
+private:
+    QAbstractItemView *m_view;
 };
+
+/** Finder's sizes: decimal units, "193 bytes", "245 KB", "1.2 MB". */
+QString finderSize(KIO::filesize_t size)
+{
+    if (size < 1000) {
+        return i18ncp("@item Finder size", "%1 byte", "%1 bytes", qulonglong(size));
+    }
+    static const char *units[] = {"KB", "MB", "GB", "TB", "PB"};
+    double value = size / 1000.0;
+    int unit = 0;
+    while (value >= 999.5 && unit < 4) {
+        value /= 1000.0;
+        ++unit;
+    }
+    QString number = value >= 99.95 ? QString::number(qRound(value)) : QLocale().toString(value, 'f', 1);
+    if (number.endsWith(QLatin1String(".0")) || number.endsWith(QLatin1String(",0"))) {
+        number.chop(2);
+    }
+    return number + QLatin1Char(' ') + QLatin1String(units[unit]);
+}
+
+/** Finder's long dates: "Today at 1:30 PM", "Sunday, October 18, 2026 at 1:30 PM". */
+QString finderDate(const QDateTime &time)
+{
+    const QLocale locale;
+    const QString clock = locale.toString(time.time(), QLocale::ShortFormat);
+    const QDate day = time.date();
+    if (day == QDate::currentDate()) {
+        return i18nc("@info Finder date", "Today at %1", clock);
+    }
+    if (day == QDate::currentDate().addDays(-1)) {
+        return i18nc("@info Finder date", "Yesterday at %1", clock);
+    }
+    return i18nc("@info Finder date: day, time", "%1 at %2", locale.toString(day, QStringLiteral("dddd, MMMM d, yyyy")), clock);
+}
+
+/** A file name broken over up to @p maxLines lines of @p width (at word breaks if it can), the last elided. */
+QString wrapName(const QString &name, const QFont &font, int width, int maxLines)
+{
+    QTextLayout layout(name, font);
+    QTextOption option;
+    option.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+    layout.setTextOption(option);
+    layout.beginLayout();
+    QStringList lines;
+    for (QTextLine line = layout.createLine(); line.isValid(); line = layout.createLine()) {
+        line.setLineWidth(width);
+        if (lines.size() == maxLines - 1) {
+            // Last line: everything left, elided in the middle.
+            lines.append(QFontMetrics(font).elidedText(name.mid(line.textStart()), Qt::ElideMiddle, width));
+            break;
+        }
+        lines.append(name.mid(line.textStart(), line.textLength()));
+    }
+    layout.endLayout();
+    return lines.join(QLatin1Char('\n'));
+}
 }
 
 FinderColumnView::FinderColumnView(QWidget *parent)
@@ -145,7 +220,6 @@ FinderColumnView::FinderColumnView(QWidget *parent)
     m_previewIcon->setAlignment(Qt::AlignCenter);
     m_previewName = new QLabel;
     m_previewName->setAlignment(Qt::AlignCenter);
-    m_previewName->setWordWrap(true);
     QFont bold = m_previewName->font();
     bold.setWeight(QFont::DemiBold);
     bold.setPointSizeF(bold.pointSizeF() * 1.1);
@@ -167,6 +241,16 @@ FinderColumnView::FinderColumnView(QWidget *parent)
     m_preview->setMinimumWidth(260);
     m_preview->setAttribute(Qt::WA_TranslucentBackground);
     setPreviewWidget(m_preview);
+    m_previewName->setWordWrap(false); // wrapName() breaks the lines
+    // The preview column's scroll area paints the style's base color; keep it see-through.
+    for (QWidget *w = m_preview->parentWidget(); w && w != this; w = w->parentWidget()) {
+        w->setAutoFillBackground(false);
+        if (auto *area = qobject_cast<QAbstractScrollArea *>(w)) {
+            area->setFrameShape(QFrame::NoFrame);
+            area->viewport()->setAutoFillBackground(false);
+            area->setStyleSheet(QStringLiteral("QAbstractScrollArea { background: transparent; border: none; }"));
+        }
+    }
     connect(this, &QColumnView::updatePreviewWidget, this, &FinderColumnView::updatePreview);
 
     connect(this, &QAbstractItemView::activated, this, &FinderColumnView::openIndex);
@@ -187,6 +271,10 @@ void FinderColumnView::setShowHiddenFiles(bool show)
 void FinderColumnView::currentChanged(const QModelIndex &current, const QModelIndex &previous)
 {
     QColumnView::currentChanged(current, previous);
+    // The highlight follows the current item's path through every column.
+    for (QAbstractItemView *column : findChildren<QAbstractItemView *>()) {
+        column->viewport()->update();
+    }
     if (m_statusTimer) {
         m_statusTimer->start();
     }
@@ -394,9 +482,24 @@ void FinderColumnView::updatePreview(const QModelIndex &index)
     const qreal dpr = devicePixelRatioF();
     QPixmap icon = QIcon::fromTheme(item.iconName()).pixmap(QSize(128, 128), dpr);
     m_previewIcon->setPixmap(icon);
-    m_previewName->setText(item.text());
+    // A real thumbnail where KDE can make one (images, videos, documents…).
+    if (m_previewJob) {
+        m_previewJob->kill();
+    }
+    if (!item.isDir()) {
+        m_previewJob = KIO::filePreview(KFileItemList{item}, QSize(256, 256) * dpr);
+        m_previewJob->setScaleType(KIO::PreviewJob::ScaledAndCached);
+        connect(m_previewJob, &KIO::PreviewJob::gotPreview, this, [this, dpr](const KFileItem &, const QPixmap &preview) {
+            QPixmap scaled = preview.scaled(QSize(220, 180) * dpr, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            scaled.setDevicePixelRatio(dpr);
+            m_previewIcon->setPixmap(scaled);
+        });
+    }
+    // Long names wrap (anywhere, if they have no spaces) instead of running off the edges.
+    const int nameWidth = m_preview->width() - m_preview->layout()->contentsMargins().left() - m_preview->layout()->contentsMargins().right() - 8;
+    m_previewName->setText(wrapName(item.text(), m_previewName->font(), std::max(120, nameWidth), 3));
     m_previewKind->setText(item.isDir() ? i18nc("@info Finder preview", "Folder")
-                                        : i18nc("@info Finder preview: kind - size", "%1 – %2", item.mimeComment(), KIO::convertSize(item.size())));
+                                        : i18nc("@info Finder preview: kind - size", "%1 – %2", item.mimeComment(), finderSize(item.size())));
     const QLocale locale;
     const auto row = [](const QString &label, const QString &value) {
         return QStringLiteral("<tr><td style='color: rgba(255,255,255,0.55); padding-right: 10px;'>%1</td><td>%2</td></tr>")
@@ -405,9 +508,9 @@ void FinderColumnView::updatePreview(const QModelIndex &index)
     QString html = QStringLiteral("<b>") + i18nc("@title Finder preview", "Information") + QStringLiteral("</b><table style='margin-top: 6px;'>");
     const QDateTime created = item.time(KFileItem::CreationTime);
     if (created.isValid()) {
-        html += row(i18nc("@label Finder preview", "Created"), locale.toString(created, QLocale::LongFormat));
+        html += row(i18nc("@label Finder preview", "Created"), finderDate(created));
     }
-    html += row(i18nc("@label Finder preview", "Modified"), locale.toString(item.time(KFileItem::ModificationTime), QLocale::LongFormat));
+    html += row(i18nc("@label Finder preview", "Modified"), finderDate(item.time(KFileItem::ModificationTime)));
     html += QStringLiteral("</table>");
     m_previewDetails->setText(html);
 }

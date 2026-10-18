@@ -2190,12 +2190,7 @@ QHash<QByteArray, QVariant> KFileItemModel::retrieveData(const KFileItem &item, 
     QHash<QByteArray, QVariant> data;
     data.insert(sharedValue("url"), item.url());
 
-    // Finder: a disk image or archive that KIO lists as a folder (in Recents,
-    // say) still shows as a file: its size, no disclosure chevron. Opening it
-    // goes by the KFileItem, so it still opens the same way.
-    const QString mime = item.mimetype();
-    const bool isDir = item.isDir() && (mime.isEmpty() || mime == QLatin1String("inode/directory") || !item.currentMimeType().isValid()
-                                        || item.currentMimeType().inherits(QStringLiteral("inode/directory")));
+    const bool isDir = item.isDir();
     if (m_requestRole[IsDirRole] && isDir) {
         data.insert(sharedValue("isDir"), true);
     }

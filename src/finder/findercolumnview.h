@@ -8,12 +8,17 @@
 #define FINDERCOLUMNVIEW_H
 
 #include <QColumnView>
+#include <QPointer>
 #include <QUrl>
 
 class KDirModel;
 class KDirSortFilterProxyModel;
 class KFileItem;
 class QLabel;
+namespace KIO
+{
+class PreviewJob;
+}
 class QTimer;
 
 /**
@@ -70,6 +75,7 @@ private:
     QLabel *m_previewName;
     QLabel *m_previewKind;
     QLabel *m_previewDetails;
+    QPointer<KIO::PreviewJob> m_previewJob; // thumbnail for the preview
 };
 
 #endif
