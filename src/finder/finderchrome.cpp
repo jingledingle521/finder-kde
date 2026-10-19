@@ -139,10 +139,10 @@ public:
     }
 
 protected:
-    // A little larger than the window decorations' (MacSequoia draws ~22 px
-    // circles 35 px apart at 1.5×); the user preferred them bigger.
-    static constexpr qreal Diameter = 16;
-    static constexpr qreal Gap = 8;
+    // Sized like the window decorations' (MacSequoia draws ~22 px
+    // circles 35 px apart at 1.5×), so all windows' stoplights match.
+    static constexpr qreal Diameter = 14.5;
+    static constexpr qreal Gap = 8.8;
     static constexpr int LeftMargin = 8;
     static constexpr int RightMargin = 14;
 
