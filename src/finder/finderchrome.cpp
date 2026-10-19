@@ -148,7 +148,7 @@ protected:
 
     QRectF circle(int i) const
     {
-        const qreal y = (height() - Diameter) / 2.0 - 1.5; // a touch above centre, as the user preferred
+        const qreal y = (height() - Diameter) / 2.0 - 3; // above centre, as the user preferred
         return QRectF(LeftMargin + i * (Diameter + Gap), y, Diameter, Diameter);
     }
 
