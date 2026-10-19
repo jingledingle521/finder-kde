@@ -213,11 +213,15 @@ DolphinMainWindow::DolphinMainWindow()
 #endif
     setupFileItemActions();
 
+    // Finder: our own macOS window chrome instead of the window manager's.
+    // Made before setupGUI(): restoring the saved window size there creates
+    // the native window, and a window made before it's marked translucent
+    // stays opaque (black corners, no glass sidebar).
+    auto *chrome = new FinderChrome(this);
+
     const bool usePhoneUi{KRuntimePlatform::runtimePlatform().contains(QLatin1String("phone"))};
     setupGUI(Save | Create | ToolBar, usePhoneUi ? QStringLiteral("finderuiforphones.rc") : QString() /* load the default dolphinui.rc file */);
 
-    // Finder: our own macOS window chrome instead of the window manager's.
-    auto *chrome = new FinderChrome(this);
     chrome->setToolBar(toolBar(QStringLiteral("mainToolBar")));
     chrome->setSidebar(m_placesPanel->parentWidget());
     stateChanged(QStringLiteral("new_file"));
