@@ -10,6 +10,7 @@
 #include <QHash>
 #include <QList>
 #include <QObject>
+#include <memory>
 #include <QPointer>
 #include <QSet>
 #include <QTimer>
@@ -92,6 +93,8 @@ Q_SIGNALS:
     void transferChanged(const FinderTransfer &transfer);
 
 private:
+    // Zips the next folder of a share (see share()), then opens the sheet.
+    void zipNextFolder(std::shared_ptr<void> state);
     FinderAirDrop();
     void run(const QStringList &args, std::function<void(int, const QByteArray &, const QByteArray &)> done);
     void refreshPeers();

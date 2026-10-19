@@ -5,6 +5,12 @@
  */
 
 #include "finderairdropservice.h"
+#include <memory>
+#include <functional>
+#include <QPointer>
+#include <QMessageBox>
+#include <QGuiApplication>
+#include <QDateTime>
 #include "finderairdropsheet.h"
 
 #include <KLocalizedString>
@@ -373,11 +379,89 @@ void FinderAirDrop::notify(const FinderTransfer &transfer)
     KNotification::event(KNotification::Notification, title, text, QStringLiteral("folder-cloud"));
 }
 
+namespace
+{
+// Folders being zipped for AirDrop (FinderAirDrop::share).
+struct AirDropZipJob {
+    QList<QUrl> ready; // the files to send so far
+    QStringList folders; // still to zip
+    QString outDir;
+    std::function<void(const QList<QUrl> &)> openSheet;
+    QPointer<QWidget> owner;
+};
+}
+
 void FinderAirDrop::share(const QList<QUrl> &files, QWidget *parent)
 {
-    auto *sheet = new FinderAirDropSheet(files, parent);
-    sheet->setAttribute(Qt::WA_DeleteOnClose);
-    sheet->open();
+    // AirDrop (omdrop) sends files, not folders: a folder goes as a .zip of
+    // it, which iPhones and Macs open with a tap, made in the runtime
+    // directory (cleared at logout) before the sheet opens.
+    QList<QUrl> ready;
+    QStringList folders;
+    for (const QUrl &url : files) {
+        if (url.isLocalFile() && QFileInfo(url.toLocalFile()).isDir()) {
+            folders.append(url.toLocalFile());
+        } else {
+            ready.append(url);
+        }
+    }
+    QPointer<QWidget> owner(parent);
+    auto openSheet = [owner](const QList<QUrl> &urls) {
+        auto *sheet = new FinderAirDropSheet(urls, owner);
+        sheet->setAttribute(Qt::WA_DeleteOnClose);
+        sheet->open();
+    };
+    if (folders.isEmpty()) {
+        openSheet(ready);
+        return;
+    }
+
+    // The zips are made one after another; each step holds the shared
+    // state, so it lives exactly as long as the work.
+    auto job = std::make_shared<AirDropZipJob>();
+    job->ready = ready;
+    job->folders = folders;
+    job->outDir = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation) + QStringLiteral("/finder-airdrop/")
+        + QString::number(QDateTime::currentMSecsSinceEpoch());
+    job->openSheet = openSheet;
+    job->owner = owner;
+    QDir().mkpath(job->outDir);
+    QGuiApplication::setOverrideCursor(Qt::BusyCursor);
+    zipNextFolder(job);
+}
+
+void FinderAirDrop::zipNextFolder(std::shared_ptr<void> state)
+{
+    auto job = std::static_pointer_cast<AirDropZipJob>(state);
+    if (job->folders.isEmpty()) {
+        QGuiApplication::restoreOverrideCursor();
+        job->openSheet(job->ready);
+        return;
+    }
+    const QFileInfo folder(job->folders.takeFirst());
+    const QString zipPath = job->outDir + QLatin1Char('/') + folder.fileName() + QStringLiteral(".zip");
+    auto fail = [job](const QString &message) {
+        QGuiApplication::restoreOverrideCursor();
+        QMessageBox::warning(job->owner, i18nc("@title:window Finder", "AirDrop"), message);
+    };
+    auto *zip = new QProcess(this);
+    zip->setWorkingDirectory(folder.absolutePath());
+    connect(zip, &QProcess::finished, this, [this, zip, job, zipPath, folder, fail](int code, QProcess::ExitStatus status) {
+        zip->deleteLater();
+        if (status != QProcess::NormalExit || code != 0 || !QFileInfo::exists(zipPath)) {
+            fail(i18nc("@info Finder", "Couldn't prepare “%1” for AirDrop.", folder.fileName()));
+            return;
+        }
+        job->ready.append(QUrl::fromLocalFile(zipPath));
+        zipNextFolder(job);
+    });
+    connect(zip, &QProcess::errorOccurred, this, [zip, fail](QProcess::ProcessError error) {
+        if (error == QProcess::FailedToStart) {
+            zip->deleteLater();
+            fail(i18nc("@info Finder", "Sending folders needs the zip program (sudo dnf install zip)."));
+        }
+    });
+    zip->start(QStringLiteral("zip"), {QStringLiteral("-r"), QStringLiteral("-q"), zipPath, folder.fileName()});
 }
 
 void FinderAirDrop::followReceiver()

@@ -311,10 +311,11 @@ void DolphinContextMenu::addItemContextMenu()
         addOpenWithActions();
     }
 
-    // Finder: Share › AirDrop… for local files (folders can't be AirDropped).
+    // Finder: Share › AirDrop… for local files and folders (folders go as
+    // a .zip, see FinderAirDrop::share).
     QList<QUrl> shareable;
     for (const KFileItem &item : std::as_const(m_selectedItems)) {
-        if (item.isLocalFile() && item.isFile()) {
+        if (item.isLocalFile() && (item.isFile() || item.isDir())) {
             shareable.append(item.url());
         }
     }
