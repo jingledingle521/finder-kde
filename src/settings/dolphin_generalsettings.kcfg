@@ -107,9 +107,10 @@
             <label>Rename single items inline</label>
             <default>true</default>
         </entry>
+        <!-- Finder: no "+" selection markers on hover, as in macOS Finder -->
         <entry name="ShowSelectionToggle" type="Bool">
             <label>Show selection toggle</label>
-            <default>true</default>
+            <default>false</default>
         </entry>
         <entry name="ShowPasteBarAfterCopying" type="Bool">
             <label>Show a bar for easy pasting after a cut or copy was done using the selection mode bottom bar.</label>
