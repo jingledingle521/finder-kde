@@ -5,6 +5,7 @@
  */
 
 #include "finderairdropsheet.h"
+#include "finderaccent.h"
 #include "finderairdrop.h"
 #include "finderairdropservice.h"
 
@@ -26,7 +27,7 @@ namespace
 QLabel *glyph(QWidget *parent, int size)
 {
     auto *label = new QLabel(parent);
-    label->setPixmap(FinderAirDropView::icon(QColor(0x0a, 0x84, 0xff)).pixmap(QSize(size, size), parent->devicePixelRatioF()));
+    label->setPixmap(FinderAirDropView::icon(finderAccent()).pixmap(QSize(size, size), parent->devicePixelRatioF()));
     label->setAlignment(Qt::AlignCenter);
     return label;
 }

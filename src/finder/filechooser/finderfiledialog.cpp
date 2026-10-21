@@ -5,6 +5,7 @@
  */
 
 #include "finderfiledialog.h"
+#include "finder/finderaccent.h"
 #include "finder/finderchrome.h"
 #include "finder/findersidebar.h"
 #include "views/dolphinview.h"
@@ -137,15 +138,21 @@ FinderFileDialog::FinderFileDialog(const Options &options)
     m_accept->setDefault(true);
     connect(m_accept, &QPushButton::clicked, this, &FinderFileDialog::accept);
     row->addWidget(m_accept);
+    // The system accent color, as macOS uses its accent for default buttons.
+    const QColor accent = finderAccent();
     bar->setStyleSheet(QStringLiteral(
         "#chooserBar { border-top: 1px solid rgba(255,255,255,24); }"
         "QLineEdit { background: rgba(255,255,255,14); border: 1px solid rgba(255,255,255,30); border-radius: 7px; padding: 4px 8px; }"
-        "QLineEdit:focus { border: 1px solid #0a84ff; }"
+        "QLineEdit:focus { border: 1px solid %1; }"
         "QPushButton { border: none; border-radius: 7px; padding: 6px 18px; min-width: 64px; background: rgba(255,255,255,30); color: white; }"
         "QPushButton:hover { background: rgba(255,255,255,44); }"
-        "QPushButton#chooserAccept { background: #0a84ff; }"
-        "QPushButton#chooserAccept:hover { background: #3a9bff; }"
-        "QPushButton#chooserAccept:disabled { background: rgba(10,132,255,90); color: rgba(255,255,255,120); }"));
+        "QPushButton#chooserAccept { background: %1; }"
+        "QPushButton#chooserAccept:hover { background: %2; }"
+        "QPushButton#chooserAccept:disabled { background: rgba(%3,%4,%5,90); color: rgba(255,255,255,120); }")
+                          .arg(accent.name(), accent.lighter(115).name())
+                          .arg(accent.red())
+                          .arg(accent.green())
+                          .arg(accent.blue()));
     layout->addWidget(bar);
     setCentralWidget(central);
 

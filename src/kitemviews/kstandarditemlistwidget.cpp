@@ -5,6 +5,7 @@
  */
 
 #include "kstandarditemlistwidget.h"
+#include "finder/finderaccent.h"
 
 #include "dolphin_contentdisplaysettings.h"
 #include "kfileitemlistview.h"
@@ -479,14 +480,14 @@ void KStandardItemListWidget::paint(QPainter *painter, const QStyleOptionGraphic
 bool KStandardItemListWidget::paintFinderHighlight(QPainter *painter, QWidget *widget, bool selected)
 {
     // Finder: no hover or focus marks; a selected item gets a gray tile behind
-    // its icon and a blue pill behind its name (a blue row in list view).
-    // Without keyboard focus the blue turns gray.
+    // its icon and an accent-colored pill behind its name (a row in list
+    // view). Without keyboard focus the accent turns gray.
     if (!selected) {
         return true;
     }
     triggerCacheRefreshing();
     const bool focused = isActiveWindow() && widget->hasFocus();
-    const QColor accent = focused ? QColor(0x0a, 0x84, 0xff) : QColor(255, 255, 255, 46);
+    const QColor accent = focused ? finderAccent() : QColor(255, 255, 255, 46);
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing);

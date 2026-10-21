@@ -5,6 +5,7 @@
  */
 
 #include "findercolumnview.h"
+#include "finderaccent.h"
 #include "finderairdrop.h"
 #include "finderairdropservice.h"
 
@@ -47,7 +48,6 @@ constexpr int RowHeight = 24;
 constexpr int IconSize = 16;
 constexpr int ColumnWidth = 230;
 
-const QColor Accent(0x0a, 0x84, 0xff);
 const QColor InactiveSelection(255, 255, 255, 46);
 const QColor Divider(255, 255, 255, 20);
 
@@ -96,7 +96,7 @@ public:
         if (selected) {
             QPainterPath path;
             path.addRoundedRect(row, 5, 5);
-            p->fillPath(path, focused ? Accent : InactiveSelection);
+            p->fillPath(path, focused ? finderAccent() : InactiveSelection);
         }
 
         const qreal dpr = p->device() ? p->device()->devicePixelRatioF() : 1.0;
@@ -341,7 +341,7 @@ void FinderColumnView::showContextMenu(QAbstractItemView *column, const QPoint &
         actions->insertOpenWithActionsTo(nullptr, &menu, QStringList());
         if (!files.isEmpty() && files.size() == items.size()) {
             QMenu *share = menu.addMenu(QIcon::fromTheme(QStringLiteral("document-share")), i18nc("@action:inmenu Finder", "Share"));
-            share->addAction(FinderAirDropView::icon(QColor(0x0a, 0x84, 0xff)), i18nc("@action:inmenu Finder", "AirDrop…"), this, [this, files]() {
+            share->addAction(FinderAirDropView::icon(finderAccent()), i18nc("@action:inmenu Finder", "AirDrop…"), this, [this, files]() {
                 FinderAirDrop::instance()->share(files, window());
             });
         }

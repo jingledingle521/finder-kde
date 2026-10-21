@@ -5,6 +5,7 @@
  */
 
 #include "findertransfers.h"
+#include "finderaccent.h"
 #include "finderairdrop.h"
 
 #include <KFormat>
@@ -20,7 +21,6 @@
 
 namespace
 {
-const QColor Accent(0x0a, 0x84, 0xff);
 constexpr int CardWidth = 340;
 
 /** One transfer: icon, title, detail, a thin progress bar and an action button. */
@@ -110,7 +110,7 @@ protected:
 
         // AirDrop badge: blue disc with the glyph; green tick when done, red when failed.
         const QRectF badge(14, 14, 38, 38);
-        QColor badgeColor = Accent;
+        QColor badgeColor = finderAccent();
         if (m_transfer.state == FinderTransfer::Done) {
             badgeColor = QColor(0x30, 0xd1, 0x58);
         } else if (m_transfer.state == FinderTransfer::Failed) {
@@ -135,7 +135,7 @@ protected:
         if (fraction > 0 && m_transfer.state != FinderTransfer::Failed) {
             QPainterPath bar;
             bar.addRoundedRect(QRectF(track.left(), track.top(), std::max(5.0, track.width() * fraction), track.height()), 2.5, 2.5);
-            p.fillPath(bar, m_transfer.state == FinderTransfer::Done ? QColor(0x30, 0xd1, 0x58) : Accent);
+            p.fillPath(bar, m_transfer.state == FinderTransfer::Done ? QColor(0x30, 0xd1, 0x58) : finderAccent());
         }
     }
 

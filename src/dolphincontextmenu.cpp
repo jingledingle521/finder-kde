@@ -5,6 +5,7 @@
  */
 
 #include "dolphincontextmenu.h"
+#include "finder/finderaccent.h"
 
 #include "dolphin_contextmenusettings.h"
 #include "dolphin_generalsettings.h"
@@ -321,7 +322,7 @@ void DolphinContextMenu::addItemContextMenu()
     }
     if (!shareable.isEmpty() && shareable.size() == m_selectedItems.size()) {
         QMenu *share = addMenu(QIcon::fromTheme(QStringLiteral("document-share")), i18nc("@action:inmenu Finder", "Share"));
-        share->addAction(FinderAirDropView::icon(QColor(0x0a, 0x84, 0xff)), i18nc("@action:inmenu Finder", "AirDrop…"), this, [this, shareable]() {
+        share->addAction(FinderAirDropView::icon(finderAccent()), i18nc("@action:inmenu Finder", "AirDrop…"), this, [this, shareable]() {
             FinderAirDrop::instance()->share(shareable, m_mainWindow);
         });
         addSeparator();

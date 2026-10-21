@@ -5,6 +5,7 @@
  */
 
 #include "finderairdrop.h"
+#include "finderaccent.h"
 #include "finderairdropservice.h"
 
 #include <KLocalizedString>
@@ -19,7 +20,6 @@
 
 namespace
 {
-const QColor Accent(0x0a, 0x84, 0xff);
 const QColor ContentColor(32, 32, 37);
 }
 
@@ -142,7 +142,7 @@ void FinderAirDropView::paintEvent(QPaintEvent *)
     p.setPen(Qt::NoPen);
     QLinearGradient fill(center - QPointF(0, 40), center + QPointF(0, 40));
     fill.setColorAt(0, QColor(0x5a, 0xc8, 0xfa));
-    fill.setColorAt(1, Accent);
+    fill.setColorAt(1, finderAccent());
     p.setBrush(fill);
     p.drawEllipse(center, 40, 40);
     const QPixmap glyph = icon(Qt::white).pixmap(QSize(52, 52), devicePixelRatioF());

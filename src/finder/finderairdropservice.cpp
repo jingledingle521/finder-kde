@@ -5,6 +5,7 @@
  */
 
 #include "finderairdropservice.h"
+#include "finderaccent.h"
 #include <memory>
 #include <functional>
 #include <QPointer>
@@ -32,7 +33,6 @@
 
 namespace
 {
-const QColor Accent(0x0a, 0x84, 0xff);
 
 /** Child processes of @p root, recursively, read from /proc. */
 QList<qint64> descendants(qint64 root)
@@ -634,8 +634,8 @@ void FinderPeerTile::paintEvent(QPaintEvent *)
     p.setRenderHint(QPainter::Antialiasing);
     const QRectF circle((width() - 72) / 2.0, 4, 72, 72);
     QLinearGradient fill(circle.topLeft(), circle.bottomLeft());
-    fill.setColorAt(0, m_hot ? Accent.lighter(130) : QColor(150, 150, 160));
-    fill.setColorAt(1, m_hot ? Accent : QColor(100, 100, 110));
+    fill.setColorAt(0, m_hot ? finderAccent().lighter(130) : QColor(150, 150, 160));
+    fill.setColorAt(1, m_hot ? finderAccent() : QColor(100, 100, 110));
     p.setPen(Qt::NoPen);
     p.setBrush(fill);
     p.drawEllipse(circle);
