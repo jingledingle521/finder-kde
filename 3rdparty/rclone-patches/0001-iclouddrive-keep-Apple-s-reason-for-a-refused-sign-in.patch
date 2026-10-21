@@ -1,0 +1,21 @@
+iclouddrive: keep Apple's reason for a refused sign-in
+
+Apple answers 403 both for a wrong password and for an account it has
+locked (serviceErrors code -20209, "This Apple Account has been locked
+for security reasons"). rclone reported both as "incorrect username or
+password", so a locked account looked like a typo. Keep Apple's reply in
+the error; Finder shows its message.
+
+diff --git a/backend/iclouddrive/api/session.go b/backend/iclouddrive/api/session.go
+index 3fd964c..6c74d87 100644
+--- a/backend/iclouddrive/api/session.go
++++ b/backend/iclouddrive/api/session.go
+@@ -436,7 +436,7 @@ func (s *Session) authSRPComplete(ctx context.Context, accountName, m1Base64, m2
+ 		fs.Debugf(nil, "iclouddrive: SRP sign in returned 412, attempting repair/complete")
+ 		return s.authRepairComplete(ctx)
+ 	case http.StatusForbidden:
+-		return fmt.Errorf("sign in failed: incorrect username or password")
++		return fmt.Errorf("sign in failed: incorrect username or password (Apple said: %s)", respBody)
+ 	default:
+ 		return fmt.Errorf("sign in failed: %s: %s", resp.Status, respBody)
+ 	}

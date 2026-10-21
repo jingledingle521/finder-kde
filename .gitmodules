@@ -2,3 +2,4 @@
 	path = 3rdparty/rclone
 	url = https://github.com/rclone/rclone
 	shallow = true
+	ignore = dirty

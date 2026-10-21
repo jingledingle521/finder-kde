@@ -9,6 +9,7 @@
 
 #include <KLocalizedString>
 
+#include <QAction>
 #include <QDesktopServices>
 #include <QHBoxLayout>
 #include <QIcon>
@@ -269,6 +270,15 @@ FinderICloudSheet::FinderICloudSheet(FinderCloud *cloud, QWidget *parent)
     m_password = new QLineEdit(account);
     m_password->setEchoMode(QLineEdit::Password);
     m_password->setPlaceholderText(i18nc("@info:placeholder", "Password"));
+    // An eye at the end of the field shows the password, to check it.
+    QAction *reveal = m_password->addAction(QIcon::fromTheme(QStringLiteral("view-visible")), QLineEdit::TrailingPosition);
+    reveal->setCheckable(true);
+    reveal->setToolTip(i18nc("@info:tooltip", "Show password"));
+    connect(reveal, &QAction::toggled, this, [this, reveal](bool shown) {
+        m_password->setEchoMode(shown ? QLineEdit::Normal : QLineEdit::Password);
+        reveal->setIcon(QIcon::fromTheme(shown ? QStringLiteral("view-hidden") : QStringLiteral("view-visible")));
+        reveal->setToolTip(shown ? i18nc("@info:tooltip", "Hide password") : i18nc("@info:tooltip", "Show password"));
+    });
     a->addWidget(m_appleId);
     a->addWidget(m_password);
     a->addWidget(noteText(i18nc("@info Finder iCloud",

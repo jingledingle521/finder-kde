@@ -589,13 +589,20 @@ set(FINDER_RCLONE_SOURCE "${CMAKE_SOURCE_DIR}/3rdparty/rclone")
 if(FINDER_BUNDLE_RCLONE AND GO_EXECUTABLE AND EXISTS "${FINDER_RCLONE_SOURCE}/go.mod")
     set(FINDER_RCLONE_BINARY "${CMAKE_CURRENT_BINARY_DIR}/rclone")
     file(GLOB_RECURSE FINDER_RCLONE_GO CONFIGURE_DEPENDS "${FINDER_RCLONE_SOURCE}/*.go")
+    # Finder's fixes to rclone, applied to the submodule unless already in.
+    file(GLOB FINDER_RCLONE_PATCHES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/3rdparty/rclone-patches/*.patch")
+    set(FINDER_RCLONE_APPLY)
+    foreach(patch ${FINDER_RCLONE_PATCHES})
+        list(APPEND FINDER_RCLONE_APPLY COMMAND sh -c "git apply --reverse --check \"$1\" 2>/dev/null || git apply \"$1\"" sh "${patch}")
+    endforeach()
     add_custom_command(
         OUTPUT "${FINDER_RCLONE_BINARY}"
+        ${FINDER_RCLONE_APPLY}
         COMMAND ${CMAKE_COMMAND} -E env CGO_ENABLED=0 GOFLAGS=-mod=mod
                 "GOCACHE=${CMAKE_CURRENT_BINARY_DIR}/go-cache"
                 ${GO_EXECUTABLE} build -trimpath -ldflags "-s -w -X github.com/rclone/rclone/fs.VersionSuffix=finder" -o "${FINDER_RCLONE_BINARY}" .
         WORKING_DIRECTORY "${FINDER_RCLONE_SOURCE}"
-        DEPENDS ${FINDER_RCLONE_GO} "${FINDER_RCLONE_SOURCE}/go.mod" "${FINDER_RCLONE_SOURCE}/go.sum"
+        DEPENDS ${FINDER_RCLONE_GO} ${FINDER_RCLONE_PATCHES} "${FINDER_RCLONE_SOURCE}/go.mod" "${FINDER_RCLONE_SOURCE}/go.sum"
         COMMENT "Building rclone for Finder's Google Drive"
         VERBATIM
     )

@@ -8,6 +8,7 @@
 
 #include <KLocalizedString>
 
+#include <QDebug>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFile>
@@ -546,8 +547,27 @@ void FinderCloud::runConfigStep(const QStringList &args, std::function<void(cons
         }
         const QJsonObject out = QJsonDocument::fromJson(process->readAllStandardOutput()).object();
         if (status != QProcess::NormalExit || code != 0 || out.isEmpty()) {
-            QString error = rcloneError(process->readAllStandardError());
-            if (error.contains(QLatin1String("incorrect username or password"), Qt::CaseInsensitive)) {
+            const QByteArray stderrText = process->readAllStandardError();
+            // The whole story goes to the journal (journalctl --user -t finder);
+            // the sheet only shows the gist. The password is never in it.
+            qWarning().noquote() << "Finder: iCloud sign-in failed (rclone exit" << code << "):" << QString::fromUtf8(stderrText).trimmed();
+            QString error = rcloneError(stderrText);
+            // Apple's own reason, when rclone passes it on (see
+            // 3rdparty/rclone-patches): e.g. a locked account, not a typo.
+            QString apple;
+            if (const int said = stderrText.indexOf("Apple said: "); said >= 0) {
+                const QByteArray reply = stderrText.mid(said + 12);
+                const int start = reply.indexOf('{');
+                const int end = reply.lastIndexOf('}');
+                const QJsonObject body = QJsonDocument::fromJson(reply.mid(start, end - start + 1)).object();
+                const QJsonArray errors = body.value(QLatin1String("serviceErrors")).toArray();
+                if (!errors.isEmpty()) {
+                    apple = errors.at(0).toObject().value(QLatin1String("message")).toString();
+                }
+            }
+            if (!apple.isEmpty()) {
+                error = apple;
+            } else if (error.contains(QLatin1String("incorrect username or password"), Qt::CaseInsensitive)) {
                 error = i18nc("@info Finder cloud drive", "Your Apple ID or password is incorrect.");
             } else if (error.contains(QLatin1String("validate2FACode")) || error.contains(QLatin1String("validateSMSCode"))) {
                 error = i18nc("@info Finder cloud drive", "That code didn't work. Check it and try again, or sign in again for a new one.");
