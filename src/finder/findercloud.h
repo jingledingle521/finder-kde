@@ -94,6 +94,8 @@ private:
     void systemctl(const QStringList &args, std::function<void(bool ok)> done = {});
     void poll();
     void checkService();
+    void followLog();
+    void signedOut();
     void requestStats();
     QString authTemplate();
 
@@ -103,6 +105,7 @@ private:
     bool m_checking = false; // a systemctl/journal check is running
     bool m_statsPending = false;
 
+    QPointer<QProcess> m_journal; // following the service's log for auth errors
     QPointer<QProcess> m_authorize;
     QUrl m_signInUrl;
     std::function<void(bool, const QString &)> m_signInDone;

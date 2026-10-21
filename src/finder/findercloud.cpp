@@ -51,6 +51,15 @@ QString runtimeDir()
     return dir.isEmpty() ? QDir::tempPath() : dir;
 }
 
+// What rclone logs when Google no longer accepts the token.
+const QRegularExpression &signedOutPattern()
+{
+    static const QRegularExpression pattern(
+        QStringLiteral("invalid_grant|token expired|couldn't fetch token|empty token|unauthorized_client|Token has been expired or revoked|Invalid Credentials|authError"),
+        QRegularExpression::CaseInsensitiveOption);
+    return pattern;
+}
+
 QString socketPath()
 {
     return runtimeDir() + QStringLiteral("/finder-google-drive.sock");
@@ -115,6 +124,7 @@ FinderCloud::FinderCloud()
             systemctl({QStringLiteral("daemon-reload")});
         }
     }
+    followLog();
     m_pollTimer.setInterval(2000);
     connect(&m_pollTimer, &QTimer::timeout, this, &FinderCloud::poll);
     m_pollTimer.start();
@@ -236,12 +246,17 @@ void FinderCloud::writeConfig(const QByteArray &token)
 
 bool FinderCloud::writeUnit()
 {
+    // The rc socket sits in the user's runtime dir (mode 0700), so only this
+    // user reaches it; --rc-no-auth lets Finder ask Google for the quota.
     const QString unit = QStringLiteral(
                              "# Written by Finder; it rewrites this file, so edits here don't last.\n"
                              "[Unit]\n"
                              "Description=Google Drive for Finder\n"
                              "After=network-online.target\n"
                              "Wants=network-online.target\n"
+                             "# A revoked token fails every start; give up instead of retrying forever.\n"
+                             "StartLimitIntervalSec=5min\n"
+                             "StartLimitBurst=5\n"
                              "\n"
                              "[Service]\n"
                              "Type=notify\n"
@@ -256,7 +271,7 @@ bool FinderCloud::writeUnit()
                              "    --dir-cache-time 5m \\\n"
                              "    --poll-interval 1m \\\n"
                              "    --drive-export-formats docx,xlsx,pptx,svg \\\n"
-                             "    --rc --rc-addr unix://%t/finder-google-drive.sock\n"
+                             "    --rc --rc-addr unix://%t/finder-google-drive.sock --rc-no-auth\n"
                              "ExecStop=/usr/bin/fusermount3 -uz \"%h/Google Drive\"\n"
                              "Restart=on-failure\n"
                              "RestartSec=10\n"
@@ -349,11 +364,15 @@ void FinderCloud::signIn(std::function<void(bool ok, const QString &error)> done
         writeConfig(token);
         writeUnit();
         setState(Starting);
+        followLog();
         systemctl({QStringLiteral("daemon-reload")}, [this](bool) {
             // restart, not start: a mount still running on an expired token
             // has to pick up the new one.
-            systemctl({QStringLiteral("enable"), Unit});
-            systemctl({QStringLiteral("restart"), Unit});
+            systemctl({QStringLiteral("reset-failed"), Unit}, [this](bool) { // past its start limit
+                systemctl({QStringLiteral("enable"), Unit}, [this](bool) {
+                    systemctl({QStringLiteral("restart"), Unit});
+                });
+            });
         });
         if (done) {
             done(true, {});
@@ -388,7 +407,9 @@ void FinderCloud::start()
     }
     writeUnit();
     systemctl({QStringLiteral("daemon-reload")}, [this](bool) {
-        systemctl({QStringLiteral("enable"), QStringLiteral("--now"), Unit});
+        systemctl({QStringLiteral("reset-failed"), Unit}, [this](bool) { // past its start limit
+            systemctl({QStringLiteral("enable"), QStringLiteral("--now"), Unit});
+        });
     });
     setState(Starting);
 }
@@ -397,6 +418,9 @@ void FinderCloud::disconnect()
 {
     cancelSignIn();
     const QByteArray token = storedToken();
+    if (m_journal) {
+        m_journal->kill();
+    }
     setState(NotConnected);
     systemctl({QStringLiteral("disable"), QStringLiteral("--now"), Unit}, [this](bool) {
         QFile::remove(unitPath());
@@ -419,9 +443,42 @@ void FinderCloud::disconnect()
     }
 }
 
+void FinderCloud::signedOut()
+{
+    // No point keeping a mount (or retrying every 10 s) with a dead token;
+    // edits not yet uploaded stay in the cache and go up after signing in.
+    systemctl({QStringLiteral("stop"), Unit});
+    setState(SignedOut, i18nc("@info Finder Google Drive", "Google signed you out. Sign in again to keep syncing."));
+}
+
+void FinderCloud::followLog()
+{
+    if (m_journal || !hasAccount()) {
+        return;
+    }
+    // A running mount doesn't exit when Google revokes its token; it only
+    // logs failed requests (the change poll makes one each minute).
+    auto *journal = new QProcess(this);
+    m_journal = journal;
+    connect(journal, &QProcess::readyReadStandardOutput, this, [this, journal]() {
+        while (journal->canReadLine()) {
+            const QString line = QString::fromUtf8(journal->readLine());
+            if (m_state != SignedOut && m_state != SigningIn && signedOutPattern().match(line).hasMatch()) {
+                signedOut();
+            }
+        }
+    });
+    connect(journal, &QProcess::finished, journal, &QObject::deleteLater);
+    journal->start(QStringLiteral("journalctl"),
+                   {QStringLiteral("--user"), QStringLiteral("-u"), Unit, QStringLiteral("-f"), QStringLiteral("-n"), QStringLiteral("0"), QStringLiteral("-o"),
+                    QStringLiteral("cat")});
+}
+
 void FinderCloud::poll()
 {
-    if (m_state == SigningIn) {
+    // Signed out stays so until the user signs in again (the service is
+    // stopped, and may still be unmounting).
+    if (m_state == SigningIn || (m_state == SignedOut && hasAccount())) {
         return;
     }
     const bool account = hasAccount();
@@ -485,12 +542,8 @@ void FinderCloud::checkService()
             journal->deleteLater();
             m_checking = false;
             const QString log = QString::fromUtf8(journal->readAllStandardOutput());
-            static const QRegularExpression signedOut(QStringLiteral("invalid_grant|token expired|couldn't fetch token|empty token|unauthorized_client|Token has been expired or revoked"),
-                                                      QRegularExpression::CaseInsensitiveOption);
-            if (signedOut.match(log).hasMatch()) {
-                // No point retrying every 10 s with a dead token.
-                systemctl({QStringLiteral("stop"), Unit});
-                setState(SignedOut, i18nc("@info Finder Google Drive", "Google signed you out. Sign in again to keep syncing."));
+            if (signedOutPattern().match(log).hasMatch()) {
+                signedOut();
                 return;
             }
             QString reason;
@@ -512,7 +565,7 @@ namespace
 {
 // One call to rclone's remote control API: HTTP/1.0 over the unix socket, so
 // the reply comes back whole, without chunking, and the socket then closes.
-void rcCall(QObject *context, const QString &method, std::function<void(const QJsonObject &)> done)
+void rcCall(QObject *context, const QString &method, std::function<void(const QJsonObject &, const QByteArray &)> done, const QByteArray &params = "{}")
 {
     auto *socket = new QLocalSocket(context);
     auto finish = [socket, done]() {
@@ -522,12 +575,13 @@ void rcCall(QObject *context, const QString &method, std::function<void(const QJ
         socket->setProperty("finished", true);
         const QByteArray reply = socket->property("reply").toByteArray() + socket->readAll();
         const int body = reply.indexOf("\r\n\r\n");
-        done(reply.startsWith("HTTP/1.") && reply.contains(" 200 ") && body > 0 ? QJsonDocument::fromJson(reply.mid(body + 4)).object() : QJsonObject());
+        const bool ok = reply.startsWith("HTTP/1.") && reply.left(reply.indexOf('\n')).contains(" 200 ") && body > 0;
+        done(ok ? QJsonDocument::fromJson(reply.mid(body + 4)).object() : QJsonObject(), body > 0 ? reply.mid(body + 4) : QByteArray());
         socket->deleteLater();
     };
-    QObject::connect(socket, &QLocalSocket::connected, socket, [socket, method]() {
-        socket->write("POST /" + method.toLatin1()
-                      + " HTTP/1.0\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}");
+    QObject::connect(socket, &QLocalSocket::connected, socket, [socket, method, params]() {
+        socket->write("POST /" + method.toLatin1() + " HTTP/1.0\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: "
+                      + QByteArray::number(params.size()) + "\r\n\r\n" + params);
     });
     QObject::connect(socket, &QLocalSocket::readyRead, socket, [socket]() {
         socket->setProperty("reply", QByteArray(socket->property("reply").toByteArray() + socket->readAll()));
@@ -545,8 +599,21 @@ void FinderCloud::requestStats()
         return;
     }
     m_statsPending = true;
-    rcCall(this, QStringLiteral("vfs/stats"), [this](const QJsonObject &vfs) {
-        rcCall(this, QStringLiteral("core/stats"), [this, vfs](const QJsonObject &core) {
+    // Once a minute, ask Google itself (for the quota): a mount whose token
+    // was revoked only fails when something touches the drive.
+    static int polls = 0;
+    if (++polls % 30 == 1) {
+        rcCall(
+            this, QStringLiteral("operations/about"),
+            [this](const QJsonObject &, const QByteArray &raw) {
+                if (m_state == Ready && signedOutPattern().match(QString::fromUtf8(raw)).hasMatch()) {
+                    signedOut();
+                }
+            },
+            "{\"fs\":\"" + Remote.toLatin1() + ":\"}");
+    }
+    rcCall(this, QStringLiteral("vfs/stats"), [this](const QJsonObject &vfs, const QByteArray &) {
+        rcCall(this, QStringLiteral("core/stats"), [this, vfs](const QJsonObject &core, const QByteArray &) {
             m_statsPending = false;
             if (m_state != Ready) {
                 return;
