@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <!DOCTYPE gui SYSTEM "kpartgui.dtd">
-<gui name="dolphin" version="52">
+<gui name="dolphin" version="53">
     <MenuBar>
         <Menu name="file">
             <Action name="new_menu" />
@@ -58,6 +58,7 @@
             <Action name="redisplay" />
             <Action name="stop" />
             <Separator/>
+            <Action name="finder_toggle_sidebar" />
             <Action name="panels" />
             <Menu name="location_bar" icon="edit-select-text">
                 <text context="@title:menu">Location Bar</text>

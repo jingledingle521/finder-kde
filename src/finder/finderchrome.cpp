@@ -41,6 +41,8 @@
 #include <QtMath>
 #include <QMainWindow>
 #include <QMouseEvent>
+#include <QPropertyAnimation>
+#include <QVBoxLayout>
 #include <QPainter>
 #include <QPainterPath>
 #include <QToolBar>
@@ -121,6 +123,42 @@ QPainterPath roundedPath(const QRectF &rect, qreal radius)
     path.addRoundedRect(rect, radius, radius);
     return path;
 }
+
+/**
+ * The sidebar slid out over the content while it's hidden: a floating dark
+ * glass panel with rounded corners and a soft shadow.
+ */
+class SidebarPeek : public QWidget
+{
+public:
+    static constexpr int Shadow = 12; // room around the panel for its shadow
+    static constexpr qreal Radius = 12;
+
+    explicit SidebarPeek(QWidget *parent)
+        : QWidget(parent)
+    {
+        auto *layout = new QVBoxLayout(this);
+        layout->setContentsMargins(Shadow, Shadow + 8, Shadow, Shadow + 6);
+    }
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing);
+        const QRectF panel = QRectF(rect()).adjusted(Shadow, Shadow, -Shadow, -Shadow);
+        for (int i = Shadow; i > 0; i -= 2) {
+            QPainterPath shadow;
+            shadow.addRoundedRect(panel.adjusted(-i, -i + 3, i, i + 3), Radius + i, Radius + i);
+            p.fillPath(shadow, QColor(0, 0, 0, 7));
+        }
+        QPainterPath path;
+        path.addRoundedRect(panel, Radius, Radius);
+        p.fillPath(path, QColor(40, 40, 44, 246));
+        p.setPen(QPen(QColor(255, 255, 255, 30), 1));
+        p.drawPath(path);
+    }
+};
 
 /**
  * The macOS stoplights: close, minimize and zoom. Glyphs appear while the
@@ -740,9 +778,15 @@ QToolButton *FinderChrome::createMoreButton(QToolBar *toolBar)
                 FinderAirDrop::instance()->share(files, m_window);
             }
         });
-        if (m_finderSidebar && !FinderCloud::instance()->hasAccount()) {
-            menu->addAction(QIcon::fromTheme(QStringLiteral("folder-cloud")), i18nc("@action:inmenu Finder", "Connect Google Drive…"), m_finderSidebar,
-                            &FinderSidebar::connectCloud);
+        for (FinderCloud *drive : FinderCloud::all()) {
+            if (m_finderSidebar && !drive->hasAccount()) {
+                menu->addAction(QIcon::fromTheme(drive->iconName()), i18nc("@action:inmenu Finder, %1 is e.g. iCloud Drive", "Connect %1…", drive->name()), this,
+                                [this, drive]() {
+                                    if (m_finderSidebar) {
+                                        m_finderSidebar->connectCloud(drive->provider());
+                                    }
+                                });
+            }
         }
         menu->addSeparator();
         const QList<QStringList> sections = {
@@ -1016,6 +1060,7 @@ bool FinderChrome::eventFilter(QObject *watched, QEvent *event)
         case QEvent::Resize:
             updateWindowEffects();
             placeTransfers();
+            hidePeek(); // its size follows the window's
             break;
         case QEvent::WindowStateChange:
             updateWindowEffects();
@@ -1027,6 +1072,7 @@ bool FinderChrome::eventFilter(QObject *watched, QEvent *event)
                 m_stoplights->update();
             }
             updateTitleColor();
+            updatePeekWatch();
             break;
         default:
             break;
@@ -1038,6 +1084,7 @@ bool FinderChrome::eventFilter(QObject *watched, QEvent *event)
         if (event->type() == QEvent::Resize || event->type() == QEvent::Move || event->type() == QEvent::Show || event->type() == QEvent::Hide) {
             updateWindowEffects();
             updateLead();
+            updatePeekWatch();
             m_window->update();
             if (m_toolBar) {
                 m_toolBar->update();
@@ -1302,3 +1349,124 @@ void FinderChrome::updateShadow()
     m_shadow->setWindow(handle);
     m_shadow->create();
 }
+
+void FinderChrome::updatePeekWatch()
+{
+    const bool watch = m_sidebar && !m_sidebar->isVisible() && m_finderSidebar && m_window->isActiveWindow();
+    if (!watch) {
+        if (m_peekTimer) {
+            m_peekTimer->stop();
+        }
+        if (m_peek && m_peek->isVisible()) {
+            // Sidebar shown for good, or the window left: no animation.
+            m_peekSlide->stop();
+            m_peek->hide();
+        }
+        return;
+    }
+    if (!m_peekTimer) {
+        m_peekTimer = new QTimer(this);
+        m_peekTimer->setInterval(50);
+        connect(m_peekTimer, &QTimer::timeout, this, &FinderChrome::peekTick);
+    }
+    m_peekDwell = 0;
+    m_peekTimer->start();
+}
+
+void FinderChrome::peekTick()
+{
+    // Polled rather than tracked with events: the pointer is over the views,
+    // not the window, and the window's edges belong to resizing.
+    const int interval = m_peekTimer->interval();
+    const QPoint pos = m_window->mapFromGlobal(QCursor::pos());
+    const bool inWindow = m_window->underMouse() && m_window->rect().contains(pos);
+    const bool shown = m_peek && m_peek->isVisible() && !m_peekClosing;
+    if (!shown) {
+        const int top = m_toolBar ? m_toolBar->mapTo(m_window, QPoint(0, m_toolBar->height())).y() : 0;
+        if (inWindow && pos.x() <= 14 && pos.y() > top && QApplication::mouseButtons() == Qt::NoButton) {
+            // A short rest on the edge, so passing over it doesn't open it.
+            m_peekDwell += interval;
+            if (m_peekDwell >= 150) {
+                m_peekDwell = 0;
+                showPeek();
+            }
+        } else {
+            m_peekDwell = 0;
+        }
+        return;
+    }
+    // Stay out while it's in use: under the pointer (with some slack to the
+    // right), a menu or dialog of its own open, or a button held.
+    const bool keep = QApplication::activePopupWidget() || QApplication::activeModalWidget() || QApplication::mouseButtons() != Qt::NoButton
+        || (inWindow && m_peek->geometry().adjusted(0, 0, 24, 0).contains(pos));
+    if (keep) {
+        m_peekAway = 0;
+    } else if ((m_peekAway += interval) >= 400) {
+        hidePeek();
+    }
+}
+
+void FinderChrome::showPeek()
+{
+    if (!m_finderSidebar) {
+        return;
+    }
+    if (!m_peek) {
+        m_peek = new SidebarPeek(m_window);
+        m_peekSidebar = new FinderSidebar(m_finderSidebar->placesModel(), m_peek);
+        m_peekSidebar->setAirDropShown(m_finderSidebar->isAirDropShown());
+        m_peek->layout()->addWidget(m_peekSidebar);
+        // Picks go through the docked sidebar, which the window listens to,
+        // and put the slid-out one away.
+        connect(m_peekSidebar, &FinderSidebar::placeActivated, m_finderSidebar, &FinderSidebar::placeActivated);
+        connect(m_peekSidebar, &FinderSidebar::tabRequested, m_finderSidebar, &FinderSidebar::tabRequested);
+        connect(m_peekSidebar, &FinderSidebar::airDropRequested, m_finderSidebar, &FinderSidebar::airDropRequested);
+        for (auto signal : {&FinderSidebar::placeActivated, &FinderSidebar::tabRequested}) {
+            connect(m_peekSidebar, signal, this, &FinderChrome::hidePeek);
+        }
+        connect(m_peekSidebar, &FinderSidebar::airDropRequested, this, &FinderChrome::hidePeek);
+        m_peekSlide = new QPropertyAnimation(m_peek, "pos", this);
+        m_peekSlide->setDuration(220);
+        m_peekSlide->setEasingCurve(QEasingCurve::OutCubic);
+        connect(m_peekSlide, &QPropertyAnimation::finished, this, [this]() {
+            if (m_peekClosing && m_peek) {
+                m_peek->hide();
+            }
+        });
+    }
+    m_peekSidebar->setUrl(m_finderSidebar->url());
+
+    // Below the toolbar, as wide as the sidebar was, down to the bottom.
+    constexpr int shadow = SidebarPeek::Shadow;
+    const int top = m_toolBar ? m_toolBar->mapTo(m_window, QPoint(0, m_toolBar->height())).y() : 8;
+    const int width = std::max(200, m_sidebar ? m_sidebar->width() : 0) + 2 * shadow;
+    const QRect target(8 - shadow, top - shadow, width, m_window->height() - top - 8 + 2 * shadow);
+    const QPoint offscreen(-width, target.y());
+
+    m_peekClosing = false;
+    m_peekAway = 0;
+    m_peekSlide->stop();
+    if (!m_peek->isVisible()) {
+        m_peek->setGeometry(QRect(offscreen, target.size()));
+        m_peek->show();
+    } else {
+        m_peek->resize(target.size());
+    }
+    m_peek->raise();
+    m_peekSlide->setStartValue(m_peek->pos());
+    m_peekSlide->setEndValue(target.topLeft());
+    m_peekSlide->start();
+}
+
+void FinderChrome::hidePeek()
+{
+    if (!m_peek || !m_peek->isVisible() || m_peekClosing) {
+        return;
+    }
+    m_peekClosing = true;
+    m_peekSlide->stop();
+    m_peekSlide->setStartValue(m_peek->pos());
+    m_peekSlide->setEndValue(QPoint(-m_peek->width(), m_peek->y()));
+    m_peekSlide->start();
+}
+

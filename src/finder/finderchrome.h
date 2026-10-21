@@ -22,6 +22,8 @@ class QMainWindow;
 class QAction;
 class QLabel;
 class QPainter;
+class QPropertyAnimation;
+class QTimer;
 class QToolBar;
 class QToolButton;
 class QWidget;
@@ -75,6 +77,15 @@ private:
     void watchNavigators();
     void updateNavigatorVisibility();
     void updateWindowEffects();
+    /**
+     * While the sidebar is hidden, resting the pointer on the window's left
+     * edge slides it out over the content; it slides away again once a place
+     * is picked or the pointer leaves it, as in macOS.
+     */
+    void updatePeekWatch();
+    void peekTick();
+    void showPeek();
+    void hidePeek();
     void updateShadow();
     Qt::Edges edgesAt(const QPointF &pos) const;
     bool isMaximized() const;
@@ -99,6 +110,14 @@ private:
     bool m_blurApplied = false;
     bool m_surfaceReady = false; // effects sent for the current native surface
     Qt::Edges m_cursorEdges;
+
+    QPointer<QWidget> m_peek; // the slid-out sidebar panel
+    QPointer<FinderSidebar> m_peekSidebar;
+    QTimer *m_peekTimer = nullptr; // follows the pointer while the sidebar is hidden
+    QPropertyAnimation *m_peekSlide = nullptr;
+    int m_peekDwell = 0; // ms the pointer has rested on the edge
+    int m_peekAway = 0; // ms the pointer has been off the slid-out sidebar
+    bool m_peekClosing = false;
 };
 
 #endif

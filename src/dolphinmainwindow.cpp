@@ -2531,6 +2531,18 @@ void DolphinMainWindow::setupDockWidgets()
 
     createPanelAction(QIcon::fromTheme(QStringLiteral("compass")), Qt::Key_F9, placesDock, QStringLiteral("show_places_panel"));
 
+    // Finder: View › Hide Sidebar / Show Sidebar, worded as on macOS (the
+    // checkable Places toggle stays under Panels, on F9).
+    QAction *sidebarAction = actionCollection()->addAction(QStringLiteral("finder_toggle_sidebar"));
+    QAction *placesToggle = placesDock->toggleViewAction();
+    auto updateSidebarText = [sidebarAction, placesToggle]() {
+        sidebarAction->setText(placesToggle->isChecked() ? i18nc("@action:inmenu View", "Hide Sidebar") : i18nc("@action:inmenu View", "Show Sidebar"));
+    };
+    updateSidebarText();
+    connect(placesToggle, &QAction::toggled, sidebarAction, updateSidebarText);
+    connect(sidebarAction, &QAction::triggered, placesToggle, &QAction::trigger);
+    actionCollection()->setDefaultShortcut(sidebarAction, Qt::CTRL | Qt::ALT | Qt::Key_S);
+
     addDockWidget(Qt::LeftDockWidgetArea, placesDock);
     connect(m_placesPanel, &PlacesPanel::placeActivated, this, &DolphinMainWindow::slotPlaceActivated);
     connect(m_placesPanel, &PlacesPanel::tabRequested, this, &DolphinMainWindow::openNewTab);
