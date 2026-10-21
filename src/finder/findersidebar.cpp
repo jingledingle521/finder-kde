@@ -302,11 +302,10 @@ void FinderSidebar::rebuild()
         item->setData(int(cloud->provider()), CloudRole);
         return item;
     };
-    // iCloud has its own section above Locations, as in Finder.
-    if (FinderCloud *icloud = FinderCloud::instance(FinderCloud::ICloudDrive); icloud->hasAccount()) {
-        header(i18nc("@title Finder sidebar section", "iCloud"));
-        m_model->appendRow(cloudItem(icloud));
-    }
+    // iCloud has its own section above Locations, as in Finder. It's
+    // always there: before signing in, clicking it opens the sign-in sheet.
+    header(i18nc("@title Finder sidebar section", "iCloud"));
+    m_model->appendRow(cloudItem(FinderCloud::instance(FinderCloud::ICloudDrive)));
     if (!locations.isEmpty()) {
         header(i18nc("@title Finder sidebar section", "Locations"));
         // AirDrop leads Locations, as in Finder; it opens the AirDrop panel.
@@ -339,7 +338,9 @@ void FinderSidebar::updateCloud()
     bool spinning = false;
     for (int row = 0; row < m_model->rowCount(); ++row) {
         if (const FinderCloud *cloud = cloudAt(m_model->index(row, 0))) {
-            m_model->item(row)->setToolTip(i18nc("@info:tooltip Finder sidebar, %1 is a drive, %2 e.g. Up to date", "%1 — %2", cloud->name(), cloud->activityText()));
+            const QString activity =
+                cloud->state() == FinderCloud::NotConnected ? i18nc("@info:tooltip Finder sidebar", "Click to sign in") : cloud->activityText();
+            m_model->item(row)->setToolTip(i18nc("@info:tooltip Finder sidebar, %1 is a drive, %2 e.g. Up to date", "%1 — %2", cloud->name(), activity));
             spinning = spinning || cloud->isBusy() || cloud->state() == FinderCloud::Starting;
         }
     }
@@ -370,10 +371,10 @@ void FinderSidebar::activateCloud(FinderCloud *cloud, bool newTab)
         newTab ? Q_EMIT tabRequested(url) : Q_EMIT placeActivated(url);
         return;
     }
+    case FinderCloud::NotConnected:
     case FinderCloud::SignedOut:
         connectCloud(cloud->provider());
         return;
-    case FinderCloud::NotConnected:
     case FinderCloud::SigningIn:
         return;
     case FinderCloud::Starting:
@@ -391,6 +392,13 @@ void FinderSidebar::cloudMenu(QMenu &menu, FinderCloud *cloud)
     QAction *status = menu.addAction(cloud->activityText());
     status->setEnabled(false);
     menu.addSeparator();
+    if (cloud->state() == FinderCloud::NotConnected) {
+        menu.addAction(QIcon::fromTheme(QStringLiteral("im-user-online")), i18nc("@action:inmenu Finder cloud drive, %1 is e.g. iCloud Drive", "Sign In to %1…", cloud->name()), this,
+                       [this, cloud]() {
+                           connectCloud(cloud->provider());
+                       });
+        return;
+    }
     if (cloud->state() == FinderCloud::SignedOut) {
         menu.addAction(QIcon::fromTheme(QStringLiteral("im-user-online")), i18nc("@action:inmenu Finder cloud drive", "Sign In Again…"), this, [this, cloud]() {
             connectCloud(cloud->provider());
