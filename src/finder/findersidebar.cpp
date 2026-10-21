@@ -234,6 +234,7 @@ void FinderSidebar::rebuild()
     QList<QStandardItem *> favorites;
     QList<QStandardItem *> locations;
     QStandardItem *trash = nullptr;
+    const QList<FinderCloud *> clouds = FinderCloud::all();
 
     for (int row = 0; row < m_places->rowCount(); ++row) {
         const QModelIndex index = m_places->index(row, 0);
@@ -251,10 +252,9 @@ void FinderSidebar::rebuild()
             label = i18nc("@item:inlistbox Finder sidebar", "Recents");
         } else if (group == KFilePlacesModel::SearchForType || group == KFilePlacesModel::TagsType) {
             continue;
-        } else if (url.isLocalFile()
-                   && std::any_of(FinderCloud::all().cbegin(), FinderCloud::all().cend(), [&url](const FinderCloud *cloud) {
-                          return url.toLocalFile() == cloud->mountPath();
-                      })) {
+        } else if (url.isLocalFile() && std::any_of(clouds.cbegin(), clouds.cend(), [&url](const FinderCloud *cloud) {
+                       return url.toLocalFile() == cloud->mountPath();
+                   })) {
             continue; // a cloud drive's mount (or a bookmark of it); listed below by name
         }
 
