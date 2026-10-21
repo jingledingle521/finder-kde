@@ -12,6 +12,8 @@
 #include <QUrl>
 
 class KFilePlacesModel;
+class QMenu;
+class QTimer;
 class QStandardItemModel;
 
 /**
@@ -38,10 +40,14 @@ public:
     /** Whether to list AirDrop (not in the file chooser). */
     void setAirDropShown(bool shown);
 
+    /** Opens the sheet that connects Google Drive, then opens the drive. */
+    void connectCloud();
+
     enum Roles {
         UrlRole = Qt::UserRole + 1,
         HeaderRole,
         PlaceIndexRole, // row in the places model
+        CloudRole, // the Google Drive item (FinderCloud)
     };
 
 Q_SIGNALS:
@@ -59,6 +65,9 @@ protected:
 private:
     void rebuild();
     void activate(const QModelIndex &index, bool newTab);
+    void activateCloud(bool newTab);
+    void cloudMenu(QMenu &menu);
+    void updateCloud();
     QModelIndex placeIndex(const QModelIndex &row) const;
 
     KFilePlacesModel *m_places;
@@ -67,6 +76,8 @@ private:
     QPersistentModelIndex m_pendingSetup; // device being mounted before opening
     bool m_pendingSetupNewTab = false;
     bool m_airDropShown = true;
+    int m_pendingCloud = 0; // open the drive once mounted: 1 here, 2 in a new tab
+    QTimer *m_spinner; // animates the drive's activity indicator
 };
 
 #endif

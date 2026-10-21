@@ -9,6 +9,7 @@
 #include "findercolumnview.h"
 #include "finderairdropservice.h"
 #include "findersidebar.h"
+#include "findercloud.h"
 #include "findertransfers.h"
 
 #include "dolphinmainwindow.h"
@@ -739,6 +740,10 @@ QToolButton *FinderChrome::createMoreButton(QToolBar *toolBar)
                 FinderAirDrop::instance()->share(files, m_window);
             }
         });
+        if (m_finderSidebar && !FinderCloud::instance()->hasAccount()) {
+            menu->addAction(QIcon::fromTheme(QStringLiteral("folder-cloud")), i18nc("@action:inmenu Finder", "Connect Google Drive…"), m_finderSidebar,
+                            &FinderSidebar::connectCloud);
+        }
         menu->addSeparator();
         const QList<QStringList> sections = {
             {QStringLiteral("create_dir"), QStringLiteral("new_menu")},

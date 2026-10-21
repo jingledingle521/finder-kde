@@ -5,7 +5,8 @@
 #
 #   finder-extras/install.sh           build and install
 #   finder-extras/install.sh --deps    first install Dolphin's build
-#                                      dependencies (Fedora; asks for your password)
+#                                      dependencies, plus Go and FUSE for the
+#                                      bundled rclone (Fedora; asks for your password)
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -14,11 +15,20 @@ apps=${XDG_DATA_HOME:-$HOME/.local/share}/applications
 
 if [ "${1:-}" = --deps ]; then
     pkexec dnf -y builddep dolphin
+    pkexec dnf -y install golang fuse3
 fi
 
 for tool in cmake ninja g++; do
     command -v "$tool" >/dev/null || { echo "missing $tool (try: $0 --deps)" >&2; exit 1; }
 done
+
+# Google Drive runs on rclone, built from this submodule. Without it (or
+# without Go) Finder falls back to a system rclone.
+if [ -d "$root/.git" ] || [ -f "$root/.git" ]; then
+    git -C "$root" submodule update --init --depth 1 3rdparty/rclone \
+        || echo "Couldn't fetch rclone; Google Drive will need a system rclone."
+fi
+command -v go >/dev/null || echo "Go isn't installed: Finder won't bundle rclone (try: $0 --deps)."
 
 cmake -S "$root" -B "$root/build" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \

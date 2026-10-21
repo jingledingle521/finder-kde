@@ -292,6 +292,8 @@ target_sources(dolphinstatic PRIVATE
     finder/finderairdropservice.cpp
     finder/finderairdropsheet.cpp
     finder/findertransfers.cpp
+    finder/findercloud.cpp
+    finder/findercloudsheet.cpp
     admin/bar.cpp
     admin/workerintegration.cpp
     animatedheightwidget.cpp
@@ -492,6 +494,7 @@ target_sources(dolphinstatic PRIVATE
 
 target_link_libraries(dolphinstatic
     dolphinprivate
+    Qt::Network
     KF6::CoreAddons
     KF6::GuiAddons
     KF6::KCMUtils
@@ -576,6 +579,33 @@ target_link_libraries(finder-filechooser
     dolphinstatic
 )
 install(TARGETS finder-filechooser ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
+
+# Finder's Google Drive runs on rclone, built from the 3rdparty/rclone
+# submodule and installed privately beside Finder (see finder/findercloud.h).
+# Without Go or the submodule, Finder falls back to a system rclone.
+option(FINDER_BUNDLE_RCLONE "Build rclone from 3rdparty/rclone for Finder's Google Drive" ON)
+find_program(GO_EXECUTABLE go)
+set(FINDER_RCLONE_SOURCE "${CMAKE_SOURCE_DIR}/3rdparty/rclone")
+if(FINDER_BUNDLE_RCLONE AND GO_EXECUTABLE AND EXISTS "${FINDER_RCLONE_SOURCE}/go.mod")
+    set(FINDER_RCLONE_BINARY "${CMAKE_CURRENT_BINARY_DIR}/rclone")
+    file(GLOB_RECURSE FINDER_RCLONE_GO CONFIGURE_DEPENDS "${FINDER_RCLONE_SOURCE}/*.go")
+    add_custom_command(
+        OUTPUT "${FINDER_RCLONE_BINARY}"
+        COMMAND ${CMAKE_COMMAND} -E env CGO_ENABLED=0 GOFLAGS=-mod=mod
+                "GOCACHE=${CMAKE_CURRENT_BINARY_DIR}/go-cache"
+                ${GO_EXECUTABLE} build -trimpath -ldflags "-s -w -X github.com/rclone/rclone/fs.VersionSuffix=finder" -o "${FINDER_RCLONE_BINARY}" .
+        WORKING_DIRECTORY "${FINDER_RCLONE_SOURCE}"
+        DEPENDS ${FINDER_RCLONE_GO} "${FINDER_RCLONE_SOURCE}/go.mod" "${FINDER_RCLONE_SOURCE}/go.sum"
+        COMMENT "Building rclone for Finder's Google Drive"
+        VERBATIM
+    )
+    add_custom_target(finder-rclone ALL DEPENDS "${FINDER_RCLONE_BINARY}")
+    install(PROGRAMS "${FINDER_RCLONE_BINARY}" DESTINATION "${KDE_INSTALL_LIBEXECDIR}/finder")
+    target_compile_definitions(dolphinstatic PRIVATE FINDER_RCLONE="${KDE_INSTALL_FULL_LIBEXECDIR}/finder/rclone")
+    message(STATUS "Finder: bundling rclone from ${FINDER_RCLONE_SOURCE}")
+else()
+    message(STATUS "Finder: not bundling rclone (needs Go and the 3rdparty/rclone submodule); Google Drive uses the system rclone")
+endif()
 
 ##########################################
 

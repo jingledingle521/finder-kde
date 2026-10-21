@@ -6,18 +6,25 @@
 
 #include "findersidebar.h"
 #include "finderairdrop.h"
+#include "findercloud.h"
+#include "findercloudsheet.h"
 
 #include <KFilePlacesModel>
 #include <KLocalizedString>
 
 #include <QAction>
 #include <QContextMenuEvent>
+#include <QDesktopServices>
 #include <QIcon>
 #include <QMenu>
+#include <QMessageBox>
 #include <QPainter>
 #include <QPainterPath>
+#include <QPushButton>
 #include <QStandardItemModel>
 #include <QStyledItemDelegate>
+#include <QTime>
+#include <QTimer>
 
 namespace
 {
@@ -111,13 +118,38 @@ public:
         const int iconX = int(pill.left()) + 8;
         p->drawPixmap(QPoint(iconX, r.top() + (r.height() - IconSize) / 2), pm);
 
+        // Google Drive: a spinner while syncing or connecting, a badge when
+        // it needs the user.
+        int statusWidth = 0;
+        if (index.data(FinderSidebar::CloudRole).toBool()) {
+            const auto *cloud = FinderCloud::instance();
+            const QRectF badge(pill.right() - 8 - 12, r.top() + (r.height() - 12) / 2.0, 12, 12);
+            if (cloud->state() == FinderCloud::SignedOut || cloud->state() == FinderCloud::Failed) {
+                p->setPen(Qt::NoPen);
+                p->setBrush(QColor(0xff, 0x9f, 0x0a));
+                p->drawEllipse(badge);
+                p->setPen(QPen(QColor(30, 30, 30), 1.6, Qt::SolidLine, Qt::RoundCap));
+                p->drawLine(QPointF(badge.center().x(), badge.top() + 3), QPointF(badge.center().x(), badge.center().y() + 1));
+                p->drawPoint(QPointF(badge.center().x(), badge.bottom() - 2.8));
+                statusWidth = 20;
+            } else if (cloud->isBusy() || cloud->state() == FinderCloud::Starting) {
+                const int angle = (QTime::currentTime().msecsSinceStartOfDay() % 1000) * 360 / 1000;
+                p->setBrush(Qt::NoBrush);
+                p->setPen(QPen(QColor(255, 255, 255, 60), 1.8));
+                p->drawEllipse(badge.adjusted(1, 1, -1, -1));
+                p->setPen(QPen(QColor(255, 255, 255, 190), 1.8, Qt::SolidLine, Qt::RoundCap));
+                p->drawArc(badge.adjusted(1, 1, -1, -1), -angle * 16, 100 * 16);
+                statusWidth = 20;
+            }
+        }
+
         p->setPen(TextColor);
         QFont font = option.font;
         if (option.state & QStyle::State_Selected) {
             font.setWeight(QFont::DemiBold); // Finder bolds the current place
         }
         p->setFont(font);
-        const QRect textRect(iconX + IconSize + 8, r.top(), int(pill.right()) - (iconX + IconSize + 8) - 6, r.height());
+        const QRect textRect(iconX + IconSize + 8, r.top(), int(pill.right()) - (iconX + IconSize + 8) - 6 - statusWidth, r.height());
         p->drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft,
                     QFontMetrics(font).elidedText(index.data(Qt::DisplayRole).toString(), Qt::ElideRight, textRect.width()));
         p->restore();
@@ -129,6 +161,7 @@ FinderSidebar::FinderSidebar(KFilePlacesModel *places, QWidget *parent)
     : QListView(parent)
     , m_places(places)
     , m_model(new QStandardItemModel(this))
+    , m_spinner(new QTimer(this))
 {
     setModel(m_model);
     setItemDelegate(new SidebarDelegate(this));
@@ -155,6 +188,21 @@ FinderSidebar::FinderSidebar(KFilePlacesModel *places, QWidget *parent)
         }
         m_pendingSetup = QPersistentModelIndex();
     });
+
+    auto *cloud = FinderCloud::instance();
+    connect(cloud, &FinderCloud::stateChanged, this, [this](FinderCloud::State state) {
+        rebuild();
+        if (state == FinderCloud::Ready && m_pendingCloud) {
+            const QUrl url = QUrl::fromLocalFile(FinderCloud::mountPath());
+            m_pendingCloud == 2 ? Q_EMIT tabRequested(url) : Q_EMIT placeActivated(url);
+            m_pendingCloud = 0;
+        } else if (state == FinderCloud::SignedOut || state == FinderCloud::Failed || state == FinderCloud::NotConnected) {
+            m_pendingCloud = 0;
+        }
+    });
+    connect(cloud, &FinderCloud::activityChanged, this, &FinderSidebar::updateCloud);
+    m_spinner->setInterval(33);
+    connect(m_spinner, &QTimer::timeout, viewport(), qOverload<>(&QWidget::update));
     rebuild();
 }
 
@@ -181,6 +229,8 @@ void FinderSidebar::rebuild()
             label = i18nc("@item:inlistbox Finder sidebar", "Recents");
         } else if (group == KFilePlacesModel::SearchForType || group == KFilePlacesModel::TagsType) {
             continue;
+        } else if (url.isLocalFile() && url.toLocalFile() == FinderCloud::mountPath()) {
+            continue; // the drive's mount (or a bookmark of it); listed below as Google Drive
         }
 
         auto *item = new QStandardItem(label);
@@ -228,11 +278,110 @@ void FinderSidebar::rebuild()
             airDrop->setData(AirDropUrl(), UrlRole);
             m_model->appendRow(airDrop);
         }
+        // Cloud storage follows AirDrop, as in Finder.
+        if (FinderCloud::instance()->hasAccount()) {
+            auto *drive = new QStandardItem(i18nc("@item:inlistbox Finder sidebar", "Google Drive"));
+            const QString icon = QStringLiteral("folder-google-drive-symbolic");
+            drive->setData(QIcon::hasThemeIcon(icon) ? icon : QStringLiteral("folder-cloud-symbolic"), Qt::DecorationRole);
+            drive->setData(QUrl::fromLocalFile(FinderCloud::mountPath()), UrlRole);
+            drive->setData(true, CloudRole);
+            m_model->appendRow(drive);
+        }
         for (auto *item : std::as_const(locations)) {
             m_model->appendRow(item);
         }
     }
     setUrl(m_url);
+    updateCloud();
+}
+
+void FinderSidebar::updateCloud()
+{
+    const auto *cloud = FinderCloud::instance();
+    for (int row = 0; row < m_model->rowCount(); ++row) {
+        if (QStandardItem *item = m_model->item(row); item->data(CloudRole).toBool()) {
+            item->setToolTip(i18nc("@info:tooltip Finder sidebar, %1 is e.g. Up to date", "Google Drive — %1", cloud->activityText()));
+        }
+    }
+    const bool spinning = cloud->hasAccount() && (cloud->isBusy() || cloud->state() == FinderCloud::Starting);
+    if (spinning && !m_spinner->isActive()) {
+        m_spinner->start();
+    } else if (!spinning) {
+        m_spinner->stop();
+    }
+    viewport()->update();
+}
+
+void FinderSidebar::connectCloud()
+{
+    auto *sheet = new FinderCloudSheet(window());
+    sheet->setAttribute(Qt::WA_DeleteOnClose);
+    connect(sheet, &QDialog::accepted, this, [this]() {
+        Q_EMIT placeActivated(QUrl::fromLocalFile(FinderCloud::mountPath()));
+    });
+    sheet->open();
+}
+
+void FinderSidebar::activateCloud(bool newTab)
+{
+    auto *cloud = FinderCloud::instance();
+    switch (cloud->state()) {
+    case FinderCloud::Ready: {
+        const QUrl url = QUrl::fromLocalFile(FinderCloud::mountPath());
+        newTab ? Q_EMIT tabRequested(url) : Q_EMIT placeActivated(url);
+        return;
+    }
+    case FinderCloud::SignedOut:
+        connectCloud();
+        return;
+    case FinderCloud::NotConnected:
+    case FinderCloud::SigningIn:
+        return;
+    case FinderCloud::Starting:
+    case FinderCloud::Failed:
+        // Open it as soon as it's mounted.
+        m_pendingCloud = newTab ? 2 : 1;
+        cloud->start();
+        return;
+    }
+}
+
+void FinderSidebar::cloudMenu(QMenu &menu)
+{
+    auto *cloud = FinderCloud::instance();
+    QAction *status = menu.addAction(cloud->activityText());
+    status->setEnabled(false);
+    menu.addSeparator();
+    if (cloud->state() == FinderCloud::SignedOut) {
+        menu.addAction(QIcon::fromTheme(QStringLiteral("im-user-online")), i18nc("@action:inmenu Finder Google Drive", "Sign In Again…"), this, &FinderSidebar::connectCloud);
+    } else if (cloud->state() == FinderCloud::Failed) {
+        menu.addAction(QIcon::fromTheme(QStringLiteral("view-refresh")), i18nc("@action:inmenu Finder Google Drive", "Try Again"), cloud, &FinderCloud::start);
+    }
+    menu.addAction(QIcon::fromTheme(QStringLiteral("internet-web-browser")), i18nc("@action:inmenu Finder Google Drive", "Open Google Drive on the Web"), this, []() {
+        QDesktopServices::openUrl(FinderCloud::webUrl());
+    });
+    menu.addSeparator();
+    menu.addAction(QIcon::fromTheme(QStringLiteral("network-disconnect")), i18nc("@action:inmenu Finder Google Drive", "Disconnect Google Drive…"), this, [this]() {
+        auto *cloud = FinderCloud::instance();
+        QString text = i18nc("@info Finder Google Drive",
+                             "Your files stay in Google Drive. Finder removes the drive from this computer, along with its local copies, "
+                             "and signs this computer out.");
+        if (cloud->uploads() > 0 || cloud->uploadErrors() > 0) {
+            text = i18ncp("@info Finder Google Drive",
+                          "1 file hasn't finished uploading. If you disconnect now, the changes to it are lost.",
+                          "%1 files haven't finished uploading. If you disconnect now, the changes to them are lost.",
+                          cloud->uploads() + cloud->uploadErrors());
+        }
+        QMessageBox box(QMessageBox::Warning, i18nc("@title:window", "Disconnect Google Drive?"), i18nc("@title Finder Google Drive", "Disconnect Google Drive?"),
+                        QMessageBox::Cancel, window());
+        box.setInformativeText(text);
+        QPushButton *disconnect = box.addButton(i18nc("@action:button Finder Google Drive", "Disconnect"), QMessageBox::DestructiveRole);
+        box.setDefaultButton(QMessageBox::Cancel);
+        box.exec();
+        if (box.clickedButton() == disconnect) {
+            cloud->disconnect();
+        }
+    });
 }
 
 void FinderSidebar::setAirDropShown(bool shown)
@@ -274,6 +423,10 @@ void FinderSidebar::activate(const QModelIndex &index, bool newTab)
 {
     if (index.data(UrlRole).toUrl() == AirDropUrl()) {
         Q_EMIT airDropRequested();
+        return;
+    }
+    if (index.data(CloudRole).toBool()) {
+        activateCloud(newTab);
         return;
     }
     const QModelIndex place = placeIndex(index);
@@ -318,16 +471,28 @@ void FinderSidebar::contextMenuEvent(QContextMenuEvent *event)
 {
     const QModelIndex index = indexAt(event->pos());
     const QModelIndex place = placeIndex(index);
-    if (!place.isValid()) {
+    const bool cloud = index.data(CloudRole).toBool();
+    QMenu menu(this);
+    if (!place.isValid() && !cloud) {
+        // Empty space or a heading: offer the drive if there isn't one.
+        if (!FinderCloud::instance()->hasAccount()) {
+            menu.addAction(QIcon::fromTheme(QStringLiteral("folder-cloud")), i18nc("@action:inmenu Finder", "Connect Google Drive…"), this, &FinderSidebar::connectCloud);
+            menu.exec(event->globalPos());
+        }
         return;
     }
-    QMenu menu(this);
     menu.addAction(QIcon::fromTheme(QStringLiteral("folder-open")), i18nc("@action:inmenu", "Open"), this, [this, index]() {
         activate(index, false);
     });
     menu.addAction(QIcon::fromTheme(QStringLiteral("tab-new")), i18nc("@action:inmenu", "Open in New Tab"), this, [this, index]() {
         activate(index, true);
     });
+    if (cloud) {
+        menu.addSeparator();
+        cloudMenu(menu);
+        menu.exec(event->globalPos());
+        return;
+    }
     if (QAction *teardown = m_places->teardownActionForIndex(place)) {
         menu.addSeparator();
         teardown->setParent(&menu);

@@ -1,0 +1,4 @@
+[submodule "3rdparty/rclone"]
+	path = 3rdparty/rclone
+	url = https://github.com/rclone/rclone
+	shallow = true
