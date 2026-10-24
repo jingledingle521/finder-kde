@@ -8,6 +8,7 @@
 // Started by D-Bus on the first request; quits after a while with nothing open.
 
 #include "filechooserportal.h"
+#include "../finderhangwatch.h"
 
 #include <KAboutData>
 #include <KLocalizedString>
@@ -20,6 +21,9 @@
 int main(int argc, char **argv)
 {
     QApplication app(argc, argv);
+    // Log where the dialog is stuck when it stops responding (shares Finder's hangs.log).
+    FinderHangWatch::start();
+    FinderHangWatch::note(QStringLiteral("Open/Save dialog"));
     app.setQuitOnLastWindowClosed(false);
     KLocalizedString::setApplicationDomain("dolphin");
 

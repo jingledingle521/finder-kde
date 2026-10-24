@@ -294,6 +294,7 @@ target_sources(dolphinstatic PRIVATE
     finder/findertransfers.cpp
     finder/findercloud.cpp
     finder/findercloudsheet.cpp
+    finder/finderhangwatch.cpp
     admin/bar.cpp
     admin/workerintegration.cpp
     animatedheightwidget.cpp

@@ -13,6 +13,7 @@
 #include "dolphin_version.h"
 #include "dolphindebug.h"
 #include "dolphinmainwindow.h"
+#include "finder/finderhangwatch.h"
 #include "global.h"
 #if HAVE_KUSERFEEDBACK
 #include "userfeedback/dolphinfeedbackprovider.h"
@@ -73,6 +74,8 @@ int main(int argc, char **argv)
     KIconTheme::initTheme();
 
     QApplication app(argc, argv);
+    // Finder: log where the window is stuck when it stops responding.
+    FinderHangWatch::start();
     app.setWindowIcon(QIcon::fromTheme(QStringLiteral("system-file-manager"), app.windowIcon()));
 
 #if HAVE_STYLE_MANAGER

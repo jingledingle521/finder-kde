@@ -7,6 +7,7 @@
  */
 
 #include "dolphinmainwindow.h"
+#include "finder/finderhangwatch.h"
 
 #include "finder/finderchrome.h"
 #include "finder/findersidebar.h"
@@ -1732,6 +1733,7 @@ void DolphinMainWindow::tabCountChanged(int count)
 void DolphinMainWindow::updateWindowTitle()
 {
     const QString newTitle = m_activeViewContainer->captionWindowTitle();
+    FinderHangWatch::note(m_activeViewContainer->url().toDisplayString(QUrl::PreferLocalFile)); // Finder: for the hang log
     if (windowTitle() != newTitle) {
         setWindowTitle(newTitle);
     }
