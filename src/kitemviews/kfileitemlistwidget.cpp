@@ -89,7 +89,8 @@ QString KFileItemListWidgetInformant::roleText(const QByteArray &role, const QHa
             value /= 1000.0;
             ++unit;
         }
-        const QString number = value >= 99.95 ? QString::number(qRound(value)) : QLocale().toString(value, 'f', 1).remove(QRegularExpression(QStringLiteral("[.,]0$")));
+        static const QRegularExpression trailingZero(QStringLiteral("[.,]0$")); // compiled once: this runs for every row
+        const QString number = value >= 99.95 ? QString::number(qRound(value)) : QLocale().toString(value, 'f', 1).remove(trailingZero);
         return number + QLatin1Char(' ') + QLatin1String(units[unit]);
     };
 

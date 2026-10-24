@@ -125,6 +125,8 @@ private:
     QHash<QString, int> m_uploads; // receiver TransferID -> transfer id
     qint64 m_lastIncomingBytes = -1;
     int m_incomingStalls = 0;
+    qint64 m_receiverPid = 0; // airdrop-receiver's main process, looked up in the background
+    QPointer<QProcess> m_pidQuery;
 };
 
 /** A nearby device as a round tile with initials; files can be dropped on it. */

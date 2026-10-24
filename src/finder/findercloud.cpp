@@ -24,11 +24,35 @@
 #include <QProcess>
 #include <QRegularExpression>
 #include <QStandardPaths>
-#include <QStorageInfo>
 #include <QUrlQuery>
 
 namespace
 {
+/**
+ * Whether an rclone mount sits at @p path, read from the mount table.
+ * Never statfs() the mount itself (QStorageInfo does): rclone answers that
+ * with a call to the provider, which can take seconds, and this runs on the
+ * GUI thread every couple of seconds.
+ */
+bool isRcloneMount(const QString &path)
+{
+    QFile mounts(QStringLiteral("/proc/self/mountinfo"));
+    if (!mounts.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+    // Spaces in mount points are written as \040 ("Google Drive").
+    const QByteArray wanted = path.toUtf8().replace('\\', "\\134").replace(' ', "\\040");
+    for (const QByteArray &line : mounts.readAll().split('\n')) {
+        // "id parent dev root MOUNTPOINT options [tags…] - FSTYPE source …"
+        const QList<QByteArray> fields = line.split(' ');
+        const int dash = fields.indexOf("-");
+        if (fields.size() > 4 && dash > 0 && dash + 1 < fields.size() && fields.at(4) == wanted && fields.at(dash + 1).startsWith("fuse.rclone")) {
+            return true;
+        }
+    }
+    return false;
+}
+
 QString runtimeDir()
 {
     const QString dir = qEnvironmentVariable("XDG_RUNTIME_DIR");
@@ -736,9 +760,7 @@ void FinderCloud::poll()
         }
         return;
     }
-    const QStorageInfo storage(mountPath());
-    const bool mounted = storage.isValid() && storage.rootPath() == mountPath() && storage.fileSystemType().startsWith("fuse.rclone");
-    if (mounted) {
+    if (isRcloneMount(mountPath())) {
         setState(Ready);
         requestStats();
         return;
@@ -815,7 +837,7 @@ namespace
 // One call to rclone's remote control API: HTTP/1.0 over the unix socket, so
 // the reply comes back whole, without chunking, and the socket then closes.
 void rcCall(QObject *context, const QString &socketPath, const QString &method, std::function<void(const QJsonObject &, const QByteArray &)> done,
-            const QByteArray &params = "{}")
+            const QByteArray &params = "{}", int timeout = 3000)
 {
     auto *socket = new QLocalSocket(context);
     auto finish = [socket, done]() {
@@ -838,7 +860,7 @@ void rcCall(QObject *context, const QString &socketPath, const QString &method, 
     });
     QObject::connect(socket, &QLocalSocket::disconnected, socket, finish);
     QObject::connect(socket, &QLocalSocket::errorOccurred, socket, finish);
-    QTimer::singleShot(3000, socket, finish);
+    QTimer::singleShot(timeout, socket, finish);
     socket->connectToServer(socketPath);
 }
 }
@@ -851,6 +873,8 @@ void FinderCloud::requestStats()
     m_statsPending = true;
     // Once a minute, ask the provider itself (for the quota): a mount whose
     // credentials were revoked only fails when something touches the drive.
+    // Google often takes longer than 3 seconds to answer; hanging up early
+    // cancels the call (rclone logs "context canceled") and tells us nothing.
     if (++m_statsPolls % 30 == 1) {
         rcCall(
             this, socketPath(), QStringLiteral("operations/about"),
@@ -859,7 +883,7 @@ void FinderCloud::requestStats()
                     signedOut();
                 }
             },
-            "{\"fs\":\"" + remote().toLatin1() + ":\"}");
+            "{\"fs\":\"" + remote().toLatin1() + ":\"}", 30000);
     }
     rcCall(this, socketPath(), QStringLiteral("vfs/stats"), [this](const QJsonObject &vfs, const QByteArray &) {
         rcCall(this, socketPath(), QStringLiteral("core/stats"), [this, vfs](const QJsonObject &core, const QByteArray &) {

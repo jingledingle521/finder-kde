@@ -273,10 +273,13 @@ void FinderAirDrop::stopPeers()
 {
     if (m_peersProcess) {
         // omdrop runs the lookup as its own process group and cleans up on TERM.
-        m_peersProcess->disconnect(this);
-        m_peersProcess->terminate();
-        m_peersProcess->waitForFinished(2000);
-        m_peersProcess->deleteLater();
+        // Don't wait for it here: that froze the window for up to 2 seconds.
+        QProcess *process = m_peersProcess;
+        m_peersProcess = nullptr;
+        process->disconnect(this);
+        connect(process, &QProcess::finished, process, &QObject::deleteLater);
+        QTimer::singleShot(2000, process, &QProcess::kill);
+        process->terminate();
     }
 }
 
@@ -585,10 +588,24 @@ void FinderAirDrop::pollProgress()
     if (m_incoming && m_transfers[m_incoming].state == FinderTransfer::Running) {
         active = true;
         FinderTransfer &t = m_transfers[m_incoming];
-        QProcess pidQuery;
-        pidQuery.start(QStringLiteral("systemctl"), {QStringLiteral("--user"), QStringLiteral("show"), QStringLiteral("-p"), QStringLiteral("MainPID"), QStringLiteral("--value"), QStringLiteral("airdrop-receiver")});
-        pidQuery.waitForFinished(1000);
-        const qint64 pid = pidQuery.readAllStandardOutput().trimmed().toLongLong();
+        // Look the receiver's PID up in the background (this runs twice a
+        // second, and waiting for systemctl here stalled the window).
+        if (!m_pidQuery) {
+            auto *pidQuery = new QProcess(this);
+            m_pidQuery = pidQuery;
+            connect(pidQuery, &QProcess::finished, this, [this, pidQuery]() {
+                m_receiverPid = pidQuery->readAllStandardOutput().trimmed().toLongLong();
+                pidQuery->deleteLater();
+            });
+            connect(pidQuery, &QProcess::errorOccurred, pidQuery, [pidQuery](QProcess::ProcessError error) {
+                if (error == QProcess::FailedToStart) {
+                    pidQuery->deleteLater();
+                }
+            });
+            pidQuery->start(QStringLiteral("systemctl"),
+                            {QStringLiteral("--user"), QStringLiteral("show"), QStringLiteral("-p"), QStringLiteral("MainPID"), QStringLiteral("--value"), QStringLiteral("airdrop-receiver")});
+        }
+        const qint64 pid = m_receiverPid;
         qint64 bytes = -1;
         const QString downloads = QDir::homePath() + QStringLiteral("/Downloads/");
         if (pid > 0) {

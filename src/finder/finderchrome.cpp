@@ -1249,8 +1249,20 @@ void FinderChrome::paintBackground()
 
 
     // A hairline above Finder's footer (Dolphin's status bar).
-    for (QWidget *child : m_window->findChildren<QWidget *>()) {
-        if (child->isVisible() && qstrcmp(child->metaObject()->className(), "DolphinStatusBar") == 0) {
+    // The window repaints on every hover and scroll in the (transparent) file
+    // view, so don't walk the whole widget tree each time; look again every
+    // half second, which catches new tabs and split views.
+    if (!m_statusBarsAge.isValid() || m_statusBarsAge.elapsed() > 500) {
+        m_statusBars.clear();
+        for (QWidget *child : m_window->findChildren<QWidget *>()) {
+            if (qstrcmp(child->metaObject()->className(), "DolphinStatusBar") == 0) {
+                m_statusBars.append(child);
+            }
+        }
+        m_statusBarsAge.start();
+    }
+    for (const QPointer<QWidget> &child : std::as_const(m_statusBars)) {
+        if (child && child->isVisible()) {
             const QPoint top = child->mapTo(m_window, QPoint(0, 0));
             p.fillRect(QRectF(top.x(), top.y(), child->width(), 1), QColor(0, 0, 0, 120));
         }

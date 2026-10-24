@@ -7,6 +7,7 @@
 #ifndef FINDERCHROME_H
 #define FINDERCHROME_H
 
+#include <QElapsedTimer>
 #include <QIcon>
 #include <QObject>
 #include <QPointer>
@@ -108,6 +109,8 @@ private:
     KWindowShadow *m_shadow = nullptr;
     QRegion m_appliedBlur; // last blur region sent to KWin
     bool m_blurApplied = false;
+    QList<QPointer<QWidget>> m_statusBars; // footers to draw a hairline over, found now and then
+    QElapsedTimer m_statusBarsAge;
     bool m_surfaceReady = false; // effects sent for the current native surface
     Qt::Edges m_cursorEdges;
 

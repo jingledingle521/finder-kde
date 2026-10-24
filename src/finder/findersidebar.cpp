@@ -23,6 +23,7 @@
 #include <QDesktopServices>
 #include <QDrag>
 #include <QFileInfo>
+#include <QHash>
 #include <QMimeData>
 #include <QIcon>
 #include <QMenu>
@@ -124,10 +125,21 @@ public:
 
         // Golden Gate: accent-colored sidebar icons while the window is active.
         const QString iconName = index.data(Qt::DecorationRole).toString();
-        static const QIcon airDrop = FinderAirDropView::icon(Qt::white);
-        const QIcon icon = iconName == QLatin1String("finder-airdrop") ? airDrop : QIcon::fromTheme(iconName);
         const qreal dpr = p->device() ? p->device()->devicePixelRatioF() : 1.0;
-        const QPixmap pm = tinted(icon, IconSize, dpr, active ? finderAccent() : QColor(160, 160, 165));
+        const QColor color = active ? finderAccent() : QColor(160, 160, 165);
+        // Tinting means a theme lookup and a fresh pixmap per row, and the
+        // sidebar repaints 30 times a second while a cloud drive syncs.
+        const QString key = iconName + QLatin1Char('|') + QString::number(color.rgba()) + QLatin1Char('|') + QString::number(dpr);
+        QPixmap pm = m_tinted.value(key);
+        if (pm.isNull()) {
+            static const QIcon airDrop = FinderAirDropView::icon(Qt::white);
+            const QIcon icon = iconName == QLatin1String("finder-airdrop") ? airDrop : QIcon::fromTheme(iconName);
+            pm = tinted(icon, IconSize, dpr, color);
+            if (m_tinted.size() > 200) {
+                m_tinted.clear(); // icon theme or accent changes leave old entries behind
+            }
+            m_tinted.insert(key, pm);
+        }
         const int iconX = int(pill.left()) + 8;
         p->drawPixmap(QPoint(iconX, r.top() + (r.height() - IconSize) / 2), pm);
 
@@ -166,6 +178,9 @@ public:
                     QFontMetrics(font).elidedText(index.data(Qt::DisplayRole).toString(), Qt::ElideRight, textRect.width()));
         p->restore();
     }
+
+private:
+    mutable QHash<QString, QPixmap> m_tinted;
 };
 }
 
@@ -224,7 +239,14 @@ FinderSidebar::FinderSidebar(KFilePlacesModel *places, QWidget *parent)
         connect(cloud, &FinderCloud::activityChanged, this, &FinderSidebar::updateCloud);
     }
     m_spinner->setInterval(33);
-    connect(m_spinner, &QTimer::timeout, viewport(), qOverload<>(&QWidget::update));
+    connect(m_spinner, &QTimer::timeout, this, [this]() {
+        // Only the spinning rows, not the whole sidebar (and the glass behind it).
+        for (int row = 0; row < m_model->rowCount(); ++row) {
+            if (cloudAt(m_model->index(row, 0))) {
+                viewport()->update(visualRect(m_model->index(row, 0)));
+            }
+        }
+    });
     rebuild();
 }
 

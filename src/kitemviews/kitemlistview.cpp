@@ -1922,7 +1922,9 @@ KItemListRubberBand *KItemListView::rubberBand() const
 
 void KItemListView::doLayout(LayoutAnimationHint hint, int changedIndex, int changedCount)
 {
-    update(); // Finder: the zebra stripes follow the layout (see paint())
+    if (useAlternateBackgrounds()) {
+        update(); // Finder: the zebra stripes follow the layout (see paint())
+    }
 
     if (m_activeTransactions > 0) {
         if (hint == NoAnimation) {
