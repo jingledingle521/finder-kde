@@ -352,8 +352,14 @@ bool FinderCloud::writeUnit()
     const QString socket = QFileInfo(socketPath()).fileName();
     const QString cache = cachePath().section(QLatin1Char('/'), -2); // finder/<drive>
     // Google exports Docs, Sheets and Slides as Office files; iCloud has no
-    // such documents, and no change feed to poll.
-    const QString extra = m_provider == GoogleDrive ? QStringLiteral("    --poll-interval 1m \\\n    --drive-export-formats docx,xlsx,pptx,svg \\\n") : QString();
+    // such documents, and no change feed to poll. With the change feed, folder
+    // listings can stay cached: once they expire, the next stat of a folder
+    // (Finder checks whether it may paste there) waits on the network.
+    const QString extra = m_provider == GoogleDrive
+        ? QStringLiteral("    --dir-cache-time 1000h \\\n    --poll-interval 1m \\\n    --drive-export-formats docx,xlsx,pptx,svg \\\n")
+        : QStringLiteral("    --dir-cache-time 5m \\\n");
+    // Finder's windows wait on the mount, so a dropped connection should fail
+    // in seconds (--timeout, --contimeout), not rclone's minutes per try.
     // The rc socket sits in the user's runtime dir (mode 0700), so only this
     // user reaches it; --rc-no-auth lets Finder ask the provider for the quota.
     const QString text = QStringLiteral(
@@ -376,7 +382,8 @@ bool FinderCloud::writeUnit()
                              "    --volname \"%6\" \\\n"
                              "    --vfs-cache-mode full \\\n"
                              "    --vfs-cache-max-size 10G \\\n"
-                             "    --dir-cache-time 5m \\\n"
+                             "    --contimeout 5s --timeout 15s --low-level-retries 3 \\\n"
+                             "    --attr-timeout 10s \\\n"
                              "%4"
                              "    --rc --rc-addr unix://%t/%7 --rc-no-auth\n"
                              "ExecStop=/usr/bin/fusermount3 -uz \"%h/%6\"\n"
