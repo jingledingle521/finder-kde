@@ -61,6 +61,7 @@ private:
     QToolButton *createMoreButton(QToolBar *toolBar);
     static QIcon groupIcon();
     static QIcon columnsIcon();
+    static QIcon moreIcon();
     /** Finder's column view on or off (laid over the active Dolphin view). */
     void setColumnMode(bool on);
     void attachColumns();
@@ -73,6 +74,10 @@ private:
     /** Puts the AirDrop progress cards in the bottom-right of the file view. */
     void placeTransfers();
     void updateTitleColor();
+    /** Draws again what doesn't follow the color scheme by itself. */
+    void updateTheme();
+    void updateToolBarStyle();
+    void sizeToolBarButtons();
     void updateLead();
     void paintCapsules(QPainter &p);
     void watchNavigators();
@@ -101,6 +106,10 @@ private:
     QPointer<QWidget> m_navigator; // the hidden breadcrumb
     QPointer<QAction> m_navigatorAction;
     QAction *m_columnsAction = nullptr;
+    QPointer<QToolButton> m_groupButton;
+    QPointer<QToolButton> m_moreButton;
+    QPointer<QWidget> m_searchButton;
+    QPointer<QAction> m_airDropAction;
     QPointer<FinderColumnView> m_columns;
     QPointer<FinderAirDropView> m_airDrop;
     QPointer<FinderSidebar> m_finderSidebar;

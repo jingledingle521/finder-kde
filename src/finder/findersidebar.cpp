@@ -6,6 +6,7 @@
 
 #include "findersidebar.h"
 #include "finderaccent.h"
+#include "findertheme.h"
 #include "finderairdrop.h"
 #include "finderairdropservice.h"
 #include "findercloud.h"
@@ -45,10 +46,22 @@ constexpr int HeaderHeight = 34;
 constexpr int SideMargin = 10; // selection inset from the sidebar edges
 constexpr int IconSize = 18;
 
-const QColor HeaderColor(255, 255, 255, 110);
-const QColor TextColor(255, 255, 255, 225);
-const QColor SelectionColor(255, 255, 255, 34);
-const QColor HoverColor(255, 255, 255, 14);
+QColor HeaderColor()
+{
+    return FinderTheme::ink(110);
+}
+QColor TextColor()
+{
+    return FinderTheme::ink(225);
+}
+QColor SelectionColor()
+{
+    return FinderTheme::ink(34);
+}
+QColor HoverColor()
+{
+    return FinderTheme::ink(14);
+}
 
 // A favorite being dragged within the sidebar: its places-model row.
 const QString PlaceMime = QStringLiteral("application/x-finder-sidebar-place");
@@ -106,7 +119,7 @@ public:
             f.setPointSizeF(f.pointSizeF() * 0.85);
             f.setWeight(QFont::DemiBold);
             p->setFont(f);
-            p->setPen(HeaderColor);
+            p->setPen(HeaderColor());
             p->drawText(r.adjusted(SideMargin + 8, 0, -SideMargin, -4), Qt::AlignLeft | Qt::AlignBottom, index.data(Qt::DisplayRole).toString());
             p->restore();
             return;
@@ -116,17 +129,17 @@ public:
         if (option.state & QStyle::State_Selected) {
             QPainterPath path;
             path.addRoundedRect(pill, 6, 6);
-            p->fillPath(path, SelectionColor);
+            p->fillPath(path, SelectionColor());
         } else if (option.state & QStyle::State_MouseOver) {
             QPainterPath path;
             path.addRoundedRect(pill, 6, 6);
-            p->fillPath(path, HoverColor);
+            p->fillPath(path, HoverColor());
         }
 
         // Golden Gate: accent-colored sidebar icons while the window is active.
         const QString iconName = index.data(Qt::DecorationRole).toString();
         const qreal dpr = p->device() ? p->device()->devicePixelRatioF() : 1.0;
-        const QColor color = active ? finderAccent() : QColor(160, 160, 165);
+        const QColor color = active ? finderAccent() : FinderTheme::inactiveIcon();
         // Tinting means a theme lookup and a fresh pixmap per row, and the
         // sidebar repaints 30 times a second while a cloud drive syncs.
         const QString key = iconName + QLatin1Char('|') + QString::number(color.rgba()) + QLatin1Char('|') + QString::number(dpr);
@@ -159,15 +172,15 @@ public:
             } else if (cloud->isBusy() || cloud->state() == FinderCloud::Starting) {
                 const int angle = (QTime::currentTime().msecsSinceStartOfDay() % 1000) * 360 / 1000;
                 p->setBrush(Qt::NoBrush);
-                p->setPen(QPen(QColor(255, 255, 255, 60), 1.8));
+                p->setPen(QPen(FinderTheme::ink(60), 1.8));
                 p->drawEllipse(badge.adjusted(1, 1, -1, -1));
-                p->setPen(QPen(QColor(255, 255, 255, 190), 1.8, Qt::SolidLine, Qt::RoundCap));
+                p->setPen(QPen(FinderTheme::ink(190), 1.8, Qt::SolidLine, Qt::RoundCap));
                 p->drawArc(badge.adjusted(1, 1, -1, -1), -angle * 16, 100 * 16);
                 statusWidth = 20;
             }
         }
 
-        p->setPen(TextColor);
+        p->setPen(TextColor());
         QFont font = option.font;
         if (option.state & QStyle::State_Selected) {
             font.setWeight(QFont::DemiBold); // Finder bolds the current place

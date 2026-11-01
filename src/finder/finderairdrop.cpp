@@ -6,6 +6,7 @@
 
 #include "finderairdrop.h"
 #include "finderaccent.h"
+#include "findertheme.h"
 #include "finderairdropservice.h"
 
 #include <KLocalizedString>
@@ -17,11 +18,6 @@
 #include <QPainter>
 #include <QPointer>
 #include <QVBoxLayout>
-
-namespace
-{
-const QColor ContentColor(32, 32, 37);
-}
 
 FinderAirDropView::FinderAirDropView(QWidget *parent)
     : QWidget(parent)
@@ -41,7 +37,9 @@ FinderAirDropView::FinderAirDropView(QWidget *parent)
     m_state = new QLabel(this);
     m_state->setAlignment(Qt::AlignCenter);
     m_state->setWordWrap(true);
-    m_state->setStyleSheet(QStringLiteral("color: rgba(255, 255, 255, 140); padding: 0px 60px;"));
+    FinderTheme::setStyleSheet(m_state, []() {
+        return QStringLiteral("color: %1; padding: 0px 60px;").arg(FinderTheme::inkCss(140));
+    });
     layout->addWidget(m_state);
     layout->addSpacing(96); // the AirDrop glyph is painted here
 
@@ -52,7 +50,9 @@ FinderAirDropView::FinderAirDropView(QWidget *parent)
     auto *row = new QHBoxLayout;
     row->addStretch(1);
     auto *label = new QLabel(i18nc("@label Finder AirDrop", "Allow me to be discovered by:"), this);
-    label->setStyleSheet(QStringLiteral("color: rgba(255, 255, 255, 170);"));
+    FinderTheme::setStyleSheet(label, []() {
+        return QStringLiteral("color: %1;").arg(FinderTheme::inkCss(170));
+    });
     row->addWidget(label);
     m_discover = new QComboBox(this);
     m_discover->addItem(i18nc("@item Finder AirDrop visibility", "No One"));
@@ -83,7 +83,9 @@ FinderAirDropView::FinderAirDropView(QWidget *parent)
                            this);
     m_warning->setAlignment(Qt::AlignCenter);
     m_warning->setWordWrap(true);
-    m_warning->setStyleSheet(QStringLiteral("color: #ffd60a; padding: 6px 40px;"));
+    FinderTheme::setStyleSheet(m_warning, []() {
+        return QStringLiteral("color: %1; padding: 6px 40px;").arg(FinderTheme::warning().name());
+    });
     layout->addWidget(m_warning);
 
     auto *airDrop = FinderAirDrop::instance();
@@ -129,13 +131,13 @@ void FinderAirDropView::paintEvent(QPaintEvent *)
 {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
-    p.fillRect(rect(), ContentColor);
+    p.fillRect(rect(), FinderTheme::content());
 
     // Radar rings spreading from the AirDrop glyph above the caption.
     const QPointF center(width() / 2.0, m_lead->geometry().top() - 56);
     for (int i = 1; i <= 6; ++i) {
         const qreal r = 70.0 * i;
-        p.setPen(QPen(QColor(255, 255, 255, std::max(4, 22 - i * 3)), 1));
+        p.setPen(QPen(FinderTheme::ink(std::max(4, 22 - i * 3)), 1));
         p.setBrush(Qt::NoBrush);
         p.drawEllipse(center, r, r);
     }

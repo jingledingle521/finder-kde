@@ -6,6 +6,7 @@
 
 #include "findercolumnview.h"
 #include "finderaccent.h"
+#include "findertheme.h"
 #include "finderairdrop.h"
 #include "finderairdropservice.h"
 
@@ -47,9 +48,6 @@ namespace
 constexpr int RowHeight = 24;
 constexpr int IconSize = 16;
 constexpr int ColumnWidth = 230;
-
-const QColor InactiveSelection(255, 255, 255, 46);
-const QColor Divider(255, 255, 255, 20);
 
 // Small icons are the full-color artwork scaled down; icon themes often ship
 // monochrome outlines at 16 px.
@@ -96,7 +94,7 @@ public:
         if (selected) {
             QPainterPath path;
             path.addRoundedRect(row, 5, 5);
-            p->fillPath(path, focused ? finderAccent() : InactiveSelection);
+            p->fillPath(path, focused ? finderAccent() : FinderTheme::inactiveSelection());
         }
 
         const qreal dpr = p->device() ? p->device()->devicePixelRatioF() : 1.0;
@@ -107,7 +105,7 @@ public:
         const bool isDir = index.data(KDirModel::FileItemRole).value<KFileItem>().isDir();
         const int chevronSpace = isDir ? 18 : 6;
         const QRect textRect(iconX + IconSize + 7, option.rect.top(), int(row.right()) - (iconX + IconSize + 7) - chevronSpace, option.rect.height());
-        p->setPen(selected && focused ? QColor(Qt::white) : QColor(255, 255, 255, 225));
+        p->setPen(selected && focused ? QColor(Qt::white) : FinderTheme::ink(225));
         p->setFont(option.font);
         p->drawText(textRect,
                     Qt::AlignVCenter | Qt::AlignLeft,
@@ -115,7 +113,7 @@ public:
 
         if (isDir) {
             const QPointF c(row.right() - 10, row.center().y());
-            p->setPen(QPen(selected && focused ? QColor(255, 255, 255, 230) : QColor(255, 255, 255, 120), 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            p->setPen(QPen(selected && focused ? QColor(255, 255, 255, 230) : FinderTheme::ink(120), 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
             p->drawPolyline(QPolygonF{c + QPointF(-1.5, -3.5), c + QPointF(2, 0), c + QPointF(-1.5, 3.5)});
         }
         p->restore();
@@ -209,7 +207,9 @@ FinderColumnView::FinderColumnView(QWidget *parent)
     setSelectionMode(QAbstractItemView::ExtendedSelection);
     setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
     // Opaque in the window's content color: it covers Dolphin's own view.
-    setStyleSheet(QStringLiteral("QColumnView { background: rgb(32, 32, 37); border: none; }"));
+    FinderTheme::setStyleSheet(this, []() {
+        return QStringLiteral("QColumnView { background: %1; border: none; }").arg(FinderTheme::content().name());
+    });
 
     // Preview column for a selected file: big icon, name, kind and details.
     m_preview = new QWidget;
@@ -226,7 +226,9 @@ FinderColumnView::FinderColumnView(QWidget *parent)
     m_previewName->setFont(bold);
     m_previewKind = new QLabel;
     m_previewKind->setAlignment(Qt::AlignCenter);
-    m_previewKind->setStyleSheet(QStringLiteral("color: rgba(255, 255, 255, 140);"));
+    FinderTheme::setStyleSheet(m_previewKind, []() {
+        return QStringLiteral("color: %1;").arg(FinderTheme::inkCss(140));
+    });
     m_previewDetails = new QLabel;
     m_previewDetails->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     m_previewDetails->setWordWrap(true);
@@ -425,8 +427,11 @@ QAbstractItemView *FinderColumnView::createColumn(const QModelIndex &rootIndex)
     column->setAttribute(Qt::WA_TranslucentBackground);
     column->viewport()->setAutoFillBackground(false);
     // A hairline between columns, as in Finder.
-    column->setStyleSheet(QStringLiteral("QAbstractItemView { background: transparent; border: none;"
-                                         " border-right: 1px solid rgba(255, 255, 255, 20); }"));
+    FinderTheme::setStyleSheet(column, []() {
+        return QStringLiteral("QAbstractItemView { background: transparent; border: none;"
+                              " border-right: 1px solid %1; }")
+            .arg(FinderTheme::inkCss(20));
+    });
     column->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     if (auto *list = qobject_cast<QListView *>(column)) {
         list->setUniformItemSizes(true);
@@ -502,8 +507,8 @@ void FinderColumnView::updatePreview(const QModelIndex &index)
                                         : i18nc("@info Finder preview: kind - size", "%1 – %2", item.mimeComment(), finderSize(item.size())));
     const QLocale locale;
     const auto row = [](const QString &label, const QString &value) {
-        return QStringLiteral("<tr><td style='color: rgba(255,255,255,0.55); padding-right: 10px;'>%1</td><td>%2</td></tr>")
-            .arg(label.toHtmlEscaped(), value.toHtmlEscaped());
+        return QStringLiteral("<tr><td style='color: %3; padding-right: 10px;'>%1</td><td>%2</td></tr>")
+            .arg(label.toHtmlEscaped(), value.toHtmlEscaped(), FinderTheme::inkCss(140));
     };
     QString html = QStringLiteral("<b>") + i18nc("@title Finder preview", "Information") + QStringLiteral("</b><table style='margin-top: 6px;'>");
     const QDateTime created = item.time(KFileItem::CreationTime);

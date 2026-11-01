@@ -6,6 +6,7 @@
 
 #include "findertransfers.h"
 #include "finderaccent.h"
+#include "findertheme.h"
 #include "finderairdrop.h"
 
 #include <KFormat>
@@ -37,11 +38,16 @@ public:
         bold.setWeight(QFont::DemiBold);
         m_title->setFont(bold);
         m_detail = new QLabel(this);
-        m_detail->setStyleSheet(QStringLiteral("color: rgba(255, 255, 255, 150);"));
+        FinderTheme::setStyleSheet(m_detail, []() {
+            return QStringLiteral("color: %1;").arg(FinderTheme::inkCss(150));
+        });
         m_button = new QToolButton(this);
         m_button->setAutoRaise(true);
-        m_button->setStyleSheet(QStringLiteral("QToolButton { color: rgba(255,255,255,200); border: none; padding: 2px 6px; border-radius: 9px; }"
-                                               "QToolButton:hover { background: rgba(255,255,255,30); }"));
+        FinderTheme::setStyleSheet(m_button, []() {
+            return QStringLiteral("QToolButton { color: %1; border: none; padding: 2px 6px; border-radius: 9px; }"
+                                  "QToolButton:hover { background: %2; }")
+                .arg(FinderTheme::inkCss(200), FinderTheme::inkCss(30));
+        });
         setFixedHeight(76);
     }
 
@@ -104,8 +110,8 @@ protected:
         const QRectF card = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
         QPainterPath path;
         path.addRoundedRect(card, 14, 14);
-        p.fillPath(path, QColor(50, 50, 56, 245));
-        p.setPen(QPen(QColor(255, 255, 255, 30), 1));
+        p.fillPath(path, FinderTheme::card());
+        p.setPen(QPen(FinderTheme::ink(30), 1));
         p.drawPath(path);
 
         // AirDrop badge: blue disc with the glyph; green tick when done, red when failed.
@@ -125,7 +131,7 @@ protected:
         const QRectF track(64, height() - 20, width() - 64 - 16, 5);
         QPainterPath trackPath;
         trackPath.addRoundedRect(track, 2.5, 2.5);
-        p.fillPath(trackPath, QColor(255, 255, 255, 30));
+        p.fillPath(trackPath, FinderTheme::ink(30));
         qreal fraction = 0;
         if (m_transfer.state == FinderTransfer::Done) {
             fraction = 1;

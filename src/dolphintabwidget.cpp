@@ -9,6 +9,7 @@
 #include "dolphin_generalsettings.h"
 #include "dolphintabbar.h"
 #include "dolphinviewcontainer.h"
+#include "finder/findertheme.h"
 #include "views/draganddrophelper.h"
 
 #include <KAcceleratorManager>
@@ -54,8 +55,11 @@ DolphinTabWidget::DolphinTabWidget(DolphinNavigatorsWidgetAction *navigatorsWidg
     newTab->setToolTip(i18nc("@info:tooltip", "New Tab"));
     newTab->setAutoRaise(true);
     newTab->setFixedSize(34, 34);
-    newTab->setStyleSheet(QStringLiteral("QToolButton { color: rgba(255,255,255,190); font-size: 17px; border: none; border-radius: 13px; margin: 4px; }"
-                                         "QToolButton:hover { background: rgba(255,255,255,24); }"));
+    FinderTheme::setStyleSheet(newTab, []() {
+        return QStringLiteral("QToolButton { color: %1; font-size: 17px; border: none; border-radius: 13px; margin: 4px; }"
+                              "QToolButton:hover { background: %2; }")
+            .arg(FinderTheme::inkCss(190), FinderTheme::inkCss(24));
+    });
     connect(newTab, &QToolButton::clicked, this, [this]() {
         openNewActivatedTab();
     });

@@ -10,6 +10,7 @@
 #include "finderairdropservice.h"
 #include "findersidebar.h"
 #include "findercloud.h"
+#include "findertheme.h"
 #include "findertransfers.h"
 
 #include "dolphinmainwindow.h"
@@ -59,12 +60,14 @@ constexpr int WindowRadius = 12; // macOS window corner radius
 constexpr int ResizeBorder = 6; // grab zone along the edges, inside the window
 constexpr int ShadowSize = 32; // how far the shadow reaches outside the window
 
-const QColor ContentColor(32, 32, 37); // Golden Gate dark content, slightly cool
-const QColor SidebarColor(44, 44, 48, 200); // translucent: KWin blurs behind it
-const QColor HairlineDark(0, 0, 0, 90);
-const QColor HairlineLight(255, 255, 255, 18);
-const QColor CapsuleFill(255, 255, 255, 20); // glass capsules behind toolbar buttons
-const QColor CapsuleRim(255, 255, 255, 26);
+QColor CapsuleFill() // glass capsules behind toolbar buttons
+{
+    return FinderTheme::ink(20);
+}
+QColor CapsuleRim()
+{
+    return FinderTheme::ink(26);
+}
 constexpr int CapsuleHeight = 34;
 constexpr int CapsulePad = 4; // between a capsule's rim and the buttons inside
 constexpr int CapsuleGap = 10; // between neighboring capsules
@@ -154,8 +157,8 @@ protected:
         }
         QPainterPath path;
         path.addRoundedRect(panel, Radius, Radius);
-        p.fillPath(path, QColor(40, 40, 44, 246));
-        p.setPen(QPen(QColor(255, 255, 255, 30), 1));
+        p.fillPath(path, FinderTheme::panel());
+        p.setPen(QPen(FinderTheme::ink(30), 1));
         p.drawPath(path);
     }
 };
@@ -209,7 +212,7 @@ protected:
         const bool active = m_window->isActiveWindow() || m_hover;
         for (int i = 0; i < 3; ++i) {
             const QRectF c = circle(i);
-            QColor fill = active ? colors[i] : QColor(80, 80, 84);
+            QColor fill = active ? colors[i] : FinderTheme::inactiveStoplight();
             if (m_pressed == i) {
                 fill = fill.darker(125);
             }
@@ -332,13 +335,7 @@ void FinderChrome::setToolBar(QToolBar *toolBar)
     toolBar->installEventFilter(this);
     // Let the window's own background (and rounded corners) show through.
     toolBar->setAutoFillBackground(false);
-    toolBar->setStyleSheet(QStringLiteral("QToolBar { background: transparent; border: none; }"
-                                         "QToolButton { background: transparent; border: none; border-radius: 13px;"
-                                         " padding: 0px; margin: 8px 0px; min-width: 38px; min-height: 26px; max-height: 26px; }"
-                                         "QToolButton:hover { background: rgba(255, 255, 255, 20); }"
-                                         "QToolButton:checked, QToolButton:pressed { background: rgba(255, 255, 255, 38); }"
-                                         "QToolButton[finderOff=\"true\"]:checked { background: transparent; }"
-                                         "QToolButton::menu-indicator { image: none; width: 0; }"));
+    updateToolBarStyle();
     if (!m_stoplights) {
         m_stoplights = new Stoplights(m_window);
     }
@@ -382,7 +379,7 @@ void FinderChrome::setToolBar(QToolBar *toolBar)
                 button->setPopupMode(QToolButton::InstantPopup);
                 button->setToolButtonStyle(Qt::ToolButtonIconOnly);
                 button->setIcon(groupIcon());
-                button->setMinimumWidth(52);
+                m_groupButton = button;
             }
         }
         if (name == QLatin1String("toggle_search")) {
@@ -396,11 +393,10 @@ void FinderChrome::setToolBar(QToolBar *toolBar)
         }
         if (name == QLatin1String("toggle_search")) {
             // Search is a round button on its own.
-            if (QWidget *button = toolBar->widgetForAction(action)) {
-                button->setFixedWidth(CapsuleHeight - 2 * CapsulePad);
-            }
+            m_searchButton = toolBar->widgetForAction(action);
         }
     }
+    sizeToolBarButtons();
     toolBar->addWidget(gap(CapsulePad + 8));
 
     if (!navigators) {
@@ -454,7 +450,8 @@ void FinderChrome::setToolBar(QToolBar *toolBar)
         if (auto *xmlWindow = qobject_cast<KXmlGuiWindow *>(m_window)) {
             QAction *airDrop = xmlWindow->actionCollection()->addAction(QStringLiteral("finder_airdrop"));
             airDrop->setText(i18nc("@action Finder", "AirDrop"));
-            airDrop->setIcon(FinderAirDropView::icon(QColor(255, 255, 255, 225)));
+            airDrop->setIcon(FinderAirDropView::icon(FinderTheme::ink(225)));
+            m_airDropAction = airDrop;
             KActionCollection::setDefaultShortcut(airDrop, QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_R));
             connect(airDrop, &QAction::triggered, this, [this]() {
                 showAirDrop({});
@@ -518,7 +515,7 @@ QIcon FinderChrome::columnsIcon()
         QPainter p(&pm);
         p.setRenderHint(QPainter::Antialiasing);
         p.scale(22.0 / 16.0, 22.0 / 16.0);
-        p.setPen(QPen(QColor(255, 255, 255, 225), 1.0));
+        p.setPen(QPen(FinderTheme::ink(225), 1.0));
         p.setBrush(Qt::NoBrush);
         p.drawRoundedRect(QRectF(1.5, 3.0, 13, 10), 2, 2);
         p.drawLine(QPointF(5.8, 3.0), QPointF(5.8, 13.0));
@@ -709,7 +706,7 @@ QIcon FinderChrome::groupIcon()
         QPainter p(&pm);
         p.setRenderHint(QPainter::Antialiasing);
         p.scale(22.0 / 16.0, 22.0 / 16.0);
-        const QColor ink(255, 255, 255, 225);
+        const QColor ink = FinderTheme::ink(225);
         p.setPen(QPen(ink, 1.0));
         p.setBrush(Qt::NoBrush);
         for (int row = 0; row < 2; ++row) {
@@ -725,9 +722,8 @@ QIcon FinderChrome::groupIcon()
     return icon;
 }
 
-QToolButton *FinderChrome::createMoreButton(QToolBar *toolBar)
+QIcon FinderChrome::moreIcon()
 {
-    auto *button = new QToolButton(toolBar);
     // Three horizontal dots, drawn so they don't depend on the icon theme.
     QIcon dots;
     for (const qreal dpr : {1.0, 1.5, 2.0}) {
@@ -737,14 +733,21 @@ QToolButton *FinderChrome::createMoreButton(QToolBar *toolBar)
         QPainter p(&pm);
         p.setRenderHint(QPainter::Antialiasing);
         p.setPen(Qt::NoPen);
-        p.setBrush(QColor(255, 255, 255, 225));
+        p.setBrush(FinderTheme::ink(225));
         for (const qreal x : {3.0, 8.0, 13.0}) {
             p.drawEllipse(QPointF(x, 8), 1.6, 1.6);
         }
         p.end();
         dots.addPixmap(pm);
     }
-    button->setIcon(dots);
+    return dots;
+}
+
+QToolButton *FinderChrome::createMoreButton(QToolBar *toolBar)
+{
+    auto *button = new QToolButton(toolBar);
+    button->setIcon(moreIcon());
+    m_moreButton = button;
     button->setToolTip(i18nc("@info:tooltip Finder toolbar", "Show actions for the selected items"));
     button->setPopupMode(QToolButton::InstantPopup);
     auto *menu = new QMenu(button);
@@ -758,7 +761,7 @@ QToolButton *FinderChrome::createMoreButton(QToolBar *toolBar)
         }
         KActionCollection *ac = window->actionCollection();
         // Finder's Share › AirDrop: send the selected files to a nearby device.
-        menu->addAction(FinderAirDropView::icon(QColor(255, 255, 255, 225)), i18nc("@action:inmenu Finder", "AirDrop…"), this, [this]() {
+        menu->addAction(FinderAirDropView::icon(FinderTheme::ink(225)), i18nc("@action:inmenu Finder", "AirDrop…"), this, [this]() {
             QList<QUrl> files;
             if (auto *window = qobject_cast<DolphinMainWindow *>(m_window)) {
                 if (DolphinViewContainer *container = window->activeViewContainer()) {
@@ -839,8 +842,58 @@ void FinderChrome::updateTitleColor()
     }
     // Bright when the window is active, gray when it's in the background.
     QPalette pal = m_title->palette();
-    pal.setColor(QPalette::WindowText, m_window->isActiveWindow() ? QColor(255, 255, 255, 235) : QColor(255, 255, 255, 110));
+    pal.setColor(QPalette::WindowText, m_window->isActiveWindow() ? FinderTheme::ink(235) : FinderTheme::ink(110));
     m_title->setPalette(pal);
+}
+
+void FinderChrome::updateToolBarStyle()
+{
+    if (!m_toolBar) {
+        return;
+    }
+    const QString sheet = QStringLiteral("QToolBar { background: transparent; border: none; }"
+                                         "QToolButton { background: transparent; border: none; border-radius: 13px;"
+                                         " padding: 0px; margin: 8px 0px; min-width: 38px; min-height: 26px; max-height: 26px; }"
+                                         "QToolButton:hover { background: %1; }"
+                                         "QToolButton:checked, QToolButton:pressed { background: %2; }"
+                                         "QToolButton[finderOff=\"true\"]:checked { background: transparent; }"
+                                         "QToolButton::menu-indicator { image: none; width: 0; }")
+                              .arg(FinderTheme::inkCss(20), FinderTheme::inkCss(38));
+    if (sheet != m_toolBar->styleSheet()) {
+        m_toolBar->setStyleSheet(sheet);
+        // Setting it again puts its own sizes back on all the buttons.
+        sizeToolBarButtons();
+    }
+}
+
+void FinderChrome::sizeToolBarButtons()
+{
+    if (m_groupButton) {
+        m_groupButton->setMinimumWidth(52);
+    }
+    if (m_searchButton) {
+        m_searchButton->setFixedWidth(CapsuleHeight - 2 * CapsulePad);
+    }
+}
+
+void FinderChrome::updateTheme()
+{
+    updateToolBarStyle();
+    // Icons drawn here in ink don't change by themselves.
+    if (m_columnsAction) {
+        m_columnsAction->setIcon(columnsIcon());
+    }
+    if (m_groupButton) {
+        m_groupButton->setIcon(groupIcon());
+    }
+    if (m_moreButton) {
+        m_moreButton->setIcon(moreIcon());
+    }
+    if (m_airDropAction) {
+        m_airDropAction->setIcon(FinderAirDropView::icon(FinderTheme::ink(225)));
+    }
+    updateTitleColor();
+    m_window->update();
 }
 
 void FinderChrome::updateLead()
@@ -895,14 +948,14 @@ void FinderChrome::paintCapsules(QPainter &p)
         if (capsule.width() < capsule.height()) { // a lone round button
             capsule.adjust(-(capsule.height() - capsule.width()) / 2, 0, (capsule.height() - capsule.width()) / 2, 0);
         }
-        p.setPen(QPen(CapsuleRim, 1));
-        p.setBrush(CapsuleFill);
+        p.setPen(QPen(CapsuleRim(), 1));
+        p.setBrush(CapsuleFill());
         const qreal r = capsule.height() / 2;
         p.drawRoundedRect(capsule.adjusted(0.5, 0.5, -0.5, -0.5), r, r);
         if (group.first() == QLatin1String("go_back") && parts.size() == 2) {
             // The thin divider between back and forward.
             const qreal x = (parts[0].right() + parts[1].left() + 1) / 2.0;
-            p.setPen(QPen(CapsuleRim, 1));
+            p.setPen(QPen(CapsuleRim(), 1));
             p.drawLine(QPointF(x, capsule.top() + 8), QPointF(x, capsule.bottom() - 8));
         }
     }
@@ -1031,6 +1084,9 @@ bool FinderChrome::eventFilter(QObject *watched, QEvent *event)
 {
     if (watched == m_window) {
         switch (event->type()) {
+        case QEvent::PaletteChange:
+            updateTheme();
+            break;
         case QEvent::Paint:
             // The window paints only our background; QMainWindow's own paint
             // would lay the style's window color over the glass.
@@ -1137,15 +1193,21 @@ bool FinderChrome::eventFilter(QObject *watched, QEvent *event)
             p.setClipPath(roundedPath(window, radius()));
             p.setCompositionMode(QPainter::CompositionMode_Source);
             const QRectF strip(offset, QSizeF(m_toolBar->size()));
-            p.fillRect(strip, ContentColor);
+            p.fillRect(strip, FinderTheme::content());
             // The glass sidebar runs all the way up behind the stoplights.
             if (m_sidebar && m_sidebar->isVisible()) {
                 const int right = m_sidebar->mapTo(m_window, QPoint(m_sidebar->width(), 0)).x();
-                p.fillRect(QRectF(0, strip.top(), right, strip.height()), SidebarColor);
+                p.fillRect(QRectF(0, strip.top(), right, strip.height()), FinderTheme::sidebar());
                 p.setCompositionMode(QPainter::CompositionMode_SourceOver);
-                p.fillRect(QRectF(right, strip.top(), 1, strip.height()), HairlineDark);
+                p.fillRect(QRectF(right, strip.top(), 1, strip.height()), FinderTheme::separator(90));
             }
             p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+            // The window's faint edge, which this strip would otherwise cover.
+            if (radius() > 0) {
+                p.setPen(QPen(FinderTheme::ink(18), 1));
+                p.setBrush(Qt::NoBrush);
+                p.drawPath(roundedPath(window.adjusted(0.5, 0.5, -0.5, -0.5), radius() - 0.5));
+            }
             p.resetTransform();
             paintCapsules(p);
             return false; // the toolbar still draws its buttons
@@ -1234,7 +1296,7 @@ void FinderChrome::paintBackground()
     const QPainterPath window = roundedPath(r, radius());
 
     p.setClipPath(window);
-    p.fillRect(r, ContentColor);
+    p.fillRect(r, FinderTheme::content());
 
     // Glass sidebar: a translucent tint KWin blurs behind; the vertical
     // hairline separates it from the content.
@@ -1242,9 +1304,9 @@ void FinderChrome::paintBackground()
         const QRect s(m_sidebar->mapTo(m_window, QPoint(0, 0)), m_sidebar->size());
         const QRectF strip(0, 0, s.right() + 1, r.height());
         p.setCompositionMode(QPainter::CompositionMode_Source);
-        p.fillRect(strip, SidebarColor);
+        p.fillRect(strip, FinderTheme::sidebar());
         p.setCompositionMode(QPainter::CompositionMode_SourceOver);
-        p.fillRect(QRectF(strip.right(), strip.top(), 1, strip.height()), HairlineDark);
+        p.fillRect(QRectF(strip.right(), strip.top(), 1, strip.height()), FinderTheme::separator(90));
     }
 
 
@@ -1264,14 +1326,14 @@ void FinderChrome::paintBackground()
     for (const QPointer<QWidget> &child : std::as_const(m_statusBars)) {
         if (child && child->isVisible()) {
             const QPoint top = child->mapTo(m_window, QPoint(0, 0));
-            p.fillRect(QRectF(top.x(), top.y(), child->width(), 1), QColor(0, 0, 0, 120));
+            p.fillRect(QRectF(top.x(), top.y(), child->width(), 1), FinderTheme::separator(120));
         }
     }
 
-    // Light inner edge around the whole window, like macOS's window border.
+    // Faint inner edge around the whole window, like macOS's window border.
     p.setClipping(false);
     if (radius() > 0) {
-        p.setPen(QPen(HairlineLight, 1));
+        p.setPen(QPen(FinderTheme::ink(18), 1));
         p.setBrush(Qt::NoBrush);
         p.drawPath(roundedPath(r.adjusted(0.5, 0.5, -0.5, -0.5), radius() - 0.5));
     }
