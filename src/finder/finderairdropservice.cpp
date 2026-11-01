@@ -6,6 +6,7 @@
 
 #include "finderairdropservice.h"
 #include "finderaccent.h"
+#include "findertheme.h"
 #include <memory>
 #include <functional>
 #include <QPointer>
@@ -672,7 +673,7 @@ void FinderPeerTile::paintEvent(QPaintEvent *)
     p.drawText(circle, Qt::AlignCenter, initials.isEmpty() ? QStringLiteral("?") : initials);
 
     p.setFont(font());
-    p.setPen(QColor(255, 255, 255, 225));
+    p.setPen(FinderTheme::ink(225));
     p.drawText(QRect(0, 84, width(), height() - 84), Qt::AlignHCenter | Qt::AlignTop | Qt::TextWordWrap, m_peer.name);
 }
 

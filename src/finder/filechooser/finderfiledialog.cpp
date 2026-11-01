@@ -6,6 +6,7 @@
 
 #include "finderfiledialog.h"
 #include "finder/finderaccent.h"
+#include "finder/findertheme.h"
 #include "finder/finderchrome.h"
 #include "finder/findersidebar.h"
 #include "views/dolphinview.h"
@@ -139,20 +140,24 @@ FinderFileDialog::FinderFileDialog(const Options &options)
     connect(m_accept, &QPushButton::clicked, this, &FinderFileDialog::accept);
     row->addWidget(m_accept);
     // The system accent color, as macOS uses its accent for default buttons.
-    const QColor accent = finderAccent();
-    bar->setStyleSheet(QStringLiteral(
-        "#chooserBar { border-top: 1px solid rgba(255,255,255,24); }"
-        "QLineEdit { background: rgba(255,255,255,14); border: 1px solid rgba(255,255,255,30); border-radius: 7px; padding: 4px 8px; }"
-        "QLineEdit:focus { border: 1px solid %1; }"
-        "QPushButton { border: none; border-radius: 7px; padding: 6px 18px; min-width: 64px; background: rgba(255,255,255,30); color: white; }"
-        "QPushButton:hover { background: rgba(255,255,255,44); }"
-        "QPushButton#chooserAccept { background: %1; }"
-        "QPushButton#chooserAccept:hover { background: %2; }"
-        "QPushButton#chooserAccept:disabled { background: rgba(%3,%4,%5,90); color: rgba(255,255,255,120); }")
-                          .arg(accent.name(), accent.lighter(115).name())
-                          .arg(accent.red())
-                          .arg(accent.green())
-                          .arg(accent.blue()));
+    FinderTheme::setStyleSheet(bar, []() {
+        const QColor accent = finderAccent();
+        const auto ink = FinderTheme::inkCss;
+        return QStringLiteral(
+                   "#chooserBar { border-top: 1px solid %6; }"
+                   "QLineEdit { background: %7; border: 1px solid %8; border-radius: 7px; padding: 4px 8px; }"
+                   "QLineEdit:focus { border: 1px solid %1; }"
+                   "QPushButton { border: none; border-radius: 7px; padding: 6px 18px; min-width: 64px; background: %8; color: %9; }"
+                   "QPushButton:hover { background: %10; }"
+                   "QPushButton#chooserAccept { background: %1; color: white; }"
+                   "QPushButton#chooserAccept:hover { background: %2; }"
+                   "QPushButton#chooserAccept:disabled { background: rgba(%3,%4,%5,90); color: %11; }")
+            .arg(accent.name(), accent.lighter(115).name())
+            .arg(accent.red())
+            .arg(accent.green())
+            .arg(accent.blue())
+            .arg(ink(24), ink(14), ink(30), ink(216), ink(44), ink(120));
+    });
     layout->addWidget(bar);
     setCentralWidget(central);
 

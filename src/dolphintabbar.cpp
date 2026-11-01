@@ -6,6 +6,7 @@
 
 #include "dolphintabbar.h"
 #include "dolphin_generalsettings.h"
+#include "finder/findertheme.h"
 #include <KLocalizedString>
 
 #include <QDragEnterEvent>
@@ -150,7 +151,7 @@ void DolphinTabBar::paintEvent(QPaintEvent *)
     // The strip: a faint rounded track the tabs sit in.
     const QRectF track = QRectF(rect()).adjusted(8, 3, -4, -3);
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor(255, 255, 255, 12));
+    p.setBrush(FinderTheme::ink(12));
     p.drawRoundedRect(track, track.height() / 2, track.height() / 2);
 
     const int current = currentIndex();
@@ -160,15 +161,15 @@ void DolphinTabBar::paintEvent(QPaintEvent *)
         const bool hovered = i == m_hoveredTab || i == m_autoActivationIndex;
         if (selected || hovered) {
             p.setPen(Qt::NoPen);
-            p.setBrush(selected ? QColor(255, 255, 255, 34) : QColor(255, 255, 255, 14));
+            p.setBrush(FinderTheme::ink(selected ? 34 : 14));
             p.drawRoundedRect(tab, tab.height() / 2, tab.height() / 2);
         } else if (i + 1 < count() && i + 1 != current && i != current) {
             // Thin divider between two unselected tabs.
-            p.fillRect(QRectF(tab.right() + 1.5, tab.top() + 7, 1, tab.height() - 14), QColor(255, 255, 255, 30));
+            p.fillRect(QRectF(tab.right() + 1.5, tab.top() + 7, 1, tab.height() - 14), FinderTheme::ink(30));
         }
 
         // Title, centered; the × takes its place on the left while hovered.
-        p.setPen(selected ? QColor(255, 255, 255, 235) : QColor(255, 255, 255, 150));
+        p.setPen(FinderTheme::ink(selected ? 235 : 150));
         p.setFont(font());
         const QRectF textRect = tab.adjusted(30, 0, -30, 0);
         p.drawText(textRect, Qt::AlignCenter, fontMetrics().elidedText(tabText(i).replace(QLatin1String("&&"), QLatin1String("&")), Qt::ElideMiddle, int(textRect.width())));
@@ -177,10 +178,10 @@ void DolphinTabBar::paintEvent(QPaintEvent *)
             const QRectF x = QRectF(closeRect(i));
             if (m_pressedClose == i) {
                 p.setPen(Qt::NoPen);
-                p.setBrush(QColor(255, 255, 255, 40));
+                p.setBrush(FinderTheme::ink(40));
                 p.drawEllipse(x);
             }
-            p.setPen(QPen(QColor(255, 255, 255, 200), 1.4, Qt::SolidLine, Qt::RoundCap));
+            p.setPen(QPen(FinderTheme::ink(200), 1.4, Qt::SolidLine, Qt::RoundCap));
             const QPointF c = x.center();
             p.drawLine(c + QPointF(-3.5, -3.5), c + QPointF(3.5, 3.5));
             p.drawLine(c + QPointF(-3.5, 3.5), c + QPointF(3.5, -3.5));

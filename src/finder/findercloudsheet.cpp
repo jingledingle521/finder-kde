@@ -5,6 +5,7 @@
  */
 
 #include "findercloudsheet.h"
+#include "findertheme.h"
 #include "findercloud.h"
 
 #include <KLocalizedString>
@@ -49,7 +50,9 @@ QLabel *noteText(const QString &text, QWidget *parent)
     QFont font = label->font();
     font.setPointSizeF(font.pointSizeF() * 0.9);
     label->setFont(font);
-    label->setStyleSheet(QStringLiteral("color: rgba(255, 255, 255, 130);"));
+    FinderTheme::setStyleSheet(label, []() {
+        return QStringLiteral("color: %1;").arg(FinderTheme::inkCss(130));
+    });
     return label;
 }
 
@@ -80,7 +83,9 @@ QLabel *bodyText(const QString &text, QWidget *parent)
     auto *label = new QLabel(text, parent);
     label->setWordWrap(true);
     label->setAlignment(Qt::AlignCenter);
-    label->setStyleSheet(QStringLiteral("color: rgba(255, 255, 255, 180);"));
+    FinderTheme::setStyleSheet(label, []() {
+        return QStringLiteral("color: %1;").arg(FinderTheme::inkCss(180));
+    });
     return label;
 }
 }

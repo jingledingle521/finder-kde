@@ -13,6 +13,9 @@ Based on Dolphin 26.08.1. Every Finder change is a commit on top of the
 - **Window**: frameless, rounded, with its own stoplights (close, minimize,
   zoom), a native shadow, and a translucent glass sidebar that runs to the
   top of the window. Drag empty toolbar space to move; double-click to zoom.
+- **Light and dark**: follows the color scheme, and changes with it while
+  running. Text, icons, fills and lines are white or black at the same
+  strength in both, as macOS's own colors are.
 - **Toolbar**: glass capsules for back/forward, the view modes (icons, list,
   columns), Group By, a "…" actions menu and search. The folder name is
   shown as a bold title; click it (or Ctrl+L) to type a path.

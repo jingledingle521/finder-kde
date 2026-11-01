@@ -6,6 +6,7 @@
 
 #include "finderairdropsheet.h"
 #include "finderaccent.h"
+#include "findertheme.h"
 #include "finderairdrop.h"
 #include "finderairdropservice.h"
 
@@ -78,7 +79,9 @@ FinderAirDropSheet::FinderAirDropSheet(const QList<QUrl> &files, QWidget *parent
                             warning);
     body->setWordWrap(true);
     body->setAlignment(Qt::AlignCenter);
-    body->setStyleSheet(QStringLiteral("color: rgba(255, 255, 255, 180);"));
+    FinderTheme::setStyleSheet(body, []() {
+        return QStringLiteral("color: %1;").arg(FinderTheme::inkCss(180));
+    });
     w->addWidget(body);
     m_warningState = new QLabel(warning);
     m_warningState->setAlignment(Qt::AlignCenter);
@@ -121,7 +124,9 @@ FinderAirDropSheet::FinderAirDropSheet(const QList<QUrl> &files, QWidget *parent
     m_searching = new QLabel(devices);
     m_searching->setAlignment(Qt::AlignCenter);
     m_searching->setWordWrap(true);
-    m_searching->setStyleSheet(QStringLiteral("color: rgba(255, 255, 255, 150);"));
+    FinderTheme::setStyleSheet(m_searching, []() {
+        return QStringLiteral("color: %1;").arg(FinderTheme::inkCss(150));
+    });
     d->addWidget(m_searching);
     auto *row = new QHBoxLayout;
     row->addStretch(1);

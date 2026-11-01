@@ -223,7 +223,7 @@ private:
 
     void drawPixmap(QPainter *painter, const QPixmap &pixmap);
     /** Draw the lines and arrows that visualize the expanded state and level of this row. */
-    void drawSiblingsInformation(QPainter *painter);
+    void drawSiblingsInformation(QPainter *painter, QWidget *widget);
 
     QRectF roleEditingRect(const QByteArray &role) const;
 

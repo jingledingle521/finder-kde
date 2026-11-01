@@ -6,6 +6,7 @@
  */
 
 #include "kitemlistheaderwidget.h"
+#include "finder/findertheme.h"
 #include "kitemviews/kitemmodelbase.h"
 
 #include <QApplication>
@@ -232,7 +233,7 @@ void KItemListHeaderWidget::paint(QPainter *painter, const QStyleOptionGraphicsI
     }
 
     // Finder: a hairline under the column titles.
-    painter->fillRect(QRectF(8, size().height() - 1, size().width() - 16, 1), QColor(255, 255, 255, 22));
+    painter->fillRect(QRectF(8, size().height() - 1, size().width() - 16, 1), FinderTheme::ink(22));
 }
 
 void KItemListHeaderWidget::mousePressEvent(QGraphicsSceneMouseEvent *event)
@@ -466,7 +467,7 @@ void KItemListHeaderWidget::paintRole(QPainter *painter, const QByteArray &role,
     painter->setRenderHint(QPainter::Antialiasing);
 
     if (orderIndex > 0) {
-        painter->setPen(QPen(QColor(255, 255, 255, 26), 1));
+        painter->setPen(QPen(FinderTheme::ink(26), 1));
         const qreal x = std::round(rect.left()) + 0.5;
         painter->drawLine(QPointF(x, rect.top() + 7), QPointF(x, rect.bottom() - 7));
     }
@@ -481,7 +482,7 @@ void KItemListHeaderWidget::paintRole(QPainter *painter, const QByteArray &role,
     if (pressed) {
         alpha = 255;
     }
-    painter->setPen(QColor(255, 255, 255, alpha));
+    painter->setPen(FinderTheme::ink(alpha));
 
     const qreal chevronSpace = sorted ? 18 : 0;
     QRectF textRect = rect.adjusted(10, 0, -8 - chevronSpace, 0);
@@ -496,7 +497,7 @@ void KItemListHeaderWidget::paintRole(QPainter *painter, const QByteArray &role,
         const qreal cx = rect.right() - 14;
         const qreal cy = rect.center().y();
         const qreal dir = m_model->sortOrder() == Qt::AscendingOrder ? 1 : -1;
-        painter->setPen(QPen(QColor(255, 255, 255, 170), 1.4, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter->setPen(QPen(FinderTheme::ink(170), 1.4, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         painter->drawPolyline(QPolygonF{QPointF(cx - 3.5, cy - 1.75 * dir), QPointF(cx, cy + 1.75 * dir), QPointF(cx + 3.5, cy - 1.75 * dir)});
     }
     painter->restore();

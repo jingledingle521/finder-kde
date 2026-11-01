@@ -6,6 +6,7 @@
 
 #include "kstandarditemlistwidget.h"
 #include "finder/finderaccent.h"
+#include "finder/findertheme.h"
 
 #include "dolphin_contentdisplaysettings.h"
 #include "kfileitemlistview.h"
@@ -342,7 +343,7 @@ void KStandardItemListWidget::paint(QPainter *painter, const QStyleOptionGraphic
     KItemListWidget::paint(painter, option, widget);
 
     if (!m_expansionArea.isEmpty()) {
-        drawSiblingsInformation(painter);
+        drawSiblingsInformation(painter, widget);
     }
 
     // Overlays are not baked into the icon pixmap: it gets rescaled to its final
@@ -487,7 +488,7 @@ bool KStandardItemListWidget::paintFinderHighlight(QPainter *painter, QWidget *w
     }
     triggerCacheRefreshing();
     const bool focused = isActiveWindow() && widget->hasFocus();
-    const QColor accent = focused ? finderAccent() : QColor(255, 255, 255, 46);
+    const QColor accent = focused ? finderAccent() : FinderTheme::inactiveSelection();
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing);
@@ -497,7 +498,7 @@ bool KStandardItemListWidget::paintFinderHighlight(QPainter *painter, QWidget *w
         // The whole row, edge to edge (with a small inset), whatever the columns.
         painter->drawRoundedRect(QRectF(6, 0, size().width() - 12, size().height()), 6, 6);
     } else {
-        painter->setBrush(QColor(255, 255, 255, 30));
+        painter->setBrush(FinderTheme::ink(30));
         painter->drawRoundedRect(m_iconRect.adjusted(-5, -5, 5, 5), 7, 7);
         if (const TextInfo *name = m_textInfo.value("text")) {
             static const QRegularExpression lineBreak(QStringLiteral("[\\x{2028}\\n]"));
@@ -1717,7 +1718,7 @@ void KStandardItemListWidget::drawPixmap(QPainter *painter, const QPixmap &pixma
     }
 }
 
-void KStandardItemListWidget::drawSiblingsInformation(QPainter *painter)
+void KStandardItemListWidget::drawSiblingsInformation(QPainter *painter, QWidget *widget)
 {
     // Finder: a small gray disclosure chevron (right when closed, down when
     // open) instead of the style's tree branches.
@@ -1737,7 +1738,8 @@ void KStandardItemListWidget::drawSiblingsInformation(QPainter *painter)
     }
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing);
-    painter->setPen(QPen(isSelected() ? QColor(255, 255, 255, 230) : QColor(255, 255, 255, 140), 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    const bool onAccent = isSelected() && isActiveWindow() && widget->hasFocus();
+    painter->setPen(QPen(onAccent ? QColor(255, 255, 255, 230) : FinderTheme::ink(140), 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     painter->drawPolyline(chevron);
     painter->restore();
 }

@@ -8,6 +8,8 @@
 
 #include "kstandarditemlistgroupheader.h"
 
+#include "finder/findertheme.h"
+
 #include <KRatingPainter>
 #include <QPainter>
 
@@ -37,7 +39,7 @@ void KStandardItemListGroupHeader::paintRole(QPainter *painter, const QRectF &ro
         QFont bold = font();
         bold.setWeight(QFont::DemiBold);
         painter->setFont(bold);
-        painter->setPen(QColor(255, 255, 255, 220));
+        painter->setPen(FinderTheme::ink(220));
         painter->drawText(roleBounds, Qt::AlignVCenter | Qt::AlignLeft, m_text);
     } else {
         painter->drawPixmap(roleBounds.topLeft(), m_pixmap);
@@ -49,7 +51,7 @@ void KStandardItemListGroupHeader::paintSeparator(QPainter *painter, const QColo
     // Finder: a faint hairline under every group title, inset like the rows.
     if (scrollOrientation() == Qt::Vertical) {
         Q_UNUSED(color)
-        painter->fillRect(QRectF(8, size().height() - 1, size().width() - 16, 1), QColor(255, 255, 255, 26));
+        painter->fillRect(QRectF(8, size().height() - 1, size().width() - 16, 1), FinderTheme::ink(26));
         return;
     }
     if (itemIndex() == 0) {

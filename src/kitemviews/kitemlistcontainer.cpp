@@ -10,6 +10,7 @@
 
 #include "kitemlistcontroller.h"
 #include "kitemlistview.h"
+#include "finder/findertheme.h"
 #include "private/kitemlistsmoothscroller.h"
 
 #ifndef QT_NO_ACCESSIBILITY
@@ -76,8 +77,8 @@ protected:
     {
         QPainter p(this);
         QLinearGradient fade(0, 0, 0, height());
-        fade.setColorAt(0, QColor(32, 32, 37, 245)); // Finder's content color
-        fade.setColorAt(1, QColor(32, 32, 37, 0));
+        fade.setColorAt(0, FinderTheme::content(245));
+        fade.setColorAt(1, FinderTheme::content(0));
         p.fillRect(rect(), fade);
     }
 };
