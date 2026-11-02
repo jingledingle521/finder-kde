@@ -330,6 +330,22 @@ QString FinderCloud::signedOutText() const
                                      : i18nc("@info Finder cloud drive", "Your iCloud sign-in expired. Sign in again to keep syncing.");
 }
 
+// rclone's built-in Google client is shared by every rclone user, and its
+// per-minute quota runs out: requests fail with rateLimitExceeded and rclone
+// backs off for many seconds while Finder waits on the mount. An OAuth client
+// of the user's own, saved from the Google Cloud console as
+// ~/.config/finder/google-client.json ("Download JSON"), avoids that.
+static QPair<QString, QString> googleClient()
+{
+    QFile file(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + QStringLiteral("/finder/google-client.json"));
+    if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    const QJsonObject root = QJsonDocument::fromJson(file.readAll()).object();
+    const QJsonObject client = root.contains(QLatin1String("installed")) ? root.value(QLatin1String("installed")).toObject() : root;
+    return {client.value(QLatin1String("client_id")).toString(), client.value(QLatin1String("client_secret")).toString()};
+}
+
 void FinderCloud::writeGoogleConfig(const QByteArray &token)
 {
     QDir().mkpath(QFileInfo(configPath()).absolutePath());
@@ -340,7 +356,13 @@ void FinderCloud::writeGoogleConfig(const QByteArray &token)
     if (!file.open(QIODevice::WriteOnly | QIODevice::NewOnly, QFileDevice::ReadOwner | QFileDevice::WriteOwner)) {
         return;
     }
-    file.write("[" + remote().toLatin1() + "]\ntype = drive\nscope = drive\ntoken = " + token + "\n");
+    // The token only works with the client it was issued to.
+    const auto [clientId, clientSecret] = googleClient();
+    QByteArray client;
+    if (!clientId.isEmpty()) {
+        client = "client_id = " + clientId.toUtf8() + "\nclient_secret = " + clientSecret.toUtf8() + "\n";
+    }
+    file.write("[" + remote().toLatin1() + "]\ntype = drive\nscope = drive\n" + client + "token = " + token + "\n");
     file.close();
     QFile::remove(configPath());
     QFile::rename(temp, configPath());
@@ -500,9 +522,14 @@ void FinderCloud::signIn(std::function<void(bool ok, const QString &error)> done
     // Finder opens the page itself, and shows its own page when Google is done.
     // --auto-confirm takes the default for rclone's follow-up questions (not a
     // Shared Drive) instead of waiting on the terminal.
-    process->start(program,
-                   {QStringLiteral("authorize"), QStringLiteral("drive"), QStringLiteral("--auth-no-open-browser"), QStringLiteral("--auto-confirm"),
-                    QStringLiteral("--config"), configPath(), QStringLiteral("--template"), authTemplate()});
+    QStringList args{QStringLiteral("authorize"), QStringLiteral("drive")};
+    const auto [clientId, clientSecret] = googleClient();
+    if (!clientId.isEmpty()) {
+        args << clientId << clientSecret;
+    }
+    args << QStringLiteral("--auth-no-open-browser") << QStringLiteral("--auto-confirm") << QStringLiteral("--config") << configPath() << QStringLiteral("--template")
+         << authTemplate();
+    process->start(program, args);
     process->closeWriteChannel();
 }
 
